@@ -1,0 +1,37 @@
+/* styles.css */
+
+/* Default Scrollbar Styles */
+.custom-scrollbar::-webkit-scrollbar {
+  width: 8px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+  background-color: transparent;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background-color: #888;
+  border-radius: 4px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background-color: #555;
+}
+
+/* Light Theme Scrollbar */
+[data-theme="light"] .custom-scrollbar::-webkit-scrollbar-thumb {
+  background-color: #d1d1d1;
+}
+
+[data-theme="light"] .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background-color: #aaa;
+}
+
+/* Dark Theme Scrollbar */
+[data-theme="dark"] .custom-scrollbar::-webkit-scrollbar-thumb {
+  background-color: #444;
+}
+
+[data-theme="dark"] .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background-color: #222;
+}
