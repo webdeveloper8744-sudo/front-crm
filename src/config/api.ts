@@ -37,6 +37,8 @@ export const API_CONFIG = {
   PRODUCTS: `${API_BASE_URL}/products`,
   ASSIGNMENTS: `${API_BASE_URL}/lead-assignments`,
   NOTIFICATIONS: `${API_BASE_URL}/notifications`,
+  STORES: `${API_BASE_URL}/store`,
+  PURCHASE_ORDERS: `${API_BASE_URL}/purchase-orders`,
 }
 
 // Helper: For file/image URLs

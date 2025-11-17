@@ -13,6 +13,8 @@ import { useAppDispatch, useAppSelector } from "@/store/hooks"
 import { fetchUsers } from "@/store/slices/userSlice"
 import { fetchProducts } from "@/store/slices/productSlice"
 import { createLead, updateLead, fetchLeads } from "@/store/slices/leadSlice" // fetchLeads imported here
+import { fetchStores } from "@/store/slices/storeSlice"
+import { fetchMTokenSerialNumbers } from "@/store/slices/purchaseOrderSlice"
 
 type Stage = "Lead" | "Contacted" | "Qualified" | "Proposal Made" | "Won" | "Lost" | "Fridge"
 
@@ -55,6 +57,10 @@ type Step2Values = {
   referredBy?: string
   referredByClientId?: string
   referredByType?: "fresh" | "existing" | "other" // added referral type tracking
+  mTokenOption?: "with" | "without"
+  mTokenSerialNumber?: string
+  mTokenStoreFilter?: string
+  mTokenAvailableList?: any[]
 }
 
 type Step3Values = {
@@ -98,6 +104,9 @@ export function LeadWizard({
   const { users } = useAppSelector((s) => s.user || { users: [] })
   const { products } = useAppSelector((s) => s.product || { products: [] })
   const { items: allLeads } = useAppSelector((s) => s.lead || { items: [] })
+  const { stores } = useAppSelector((s) => s.store || { stores: [] })
+  const { serialNumbers } = useAppSelector((s) => s.purchaseOrder || { serialNumbers: [] })
+
 
   const appliedProductDefaultRef = React.useRef(false)
   const initialLeadProductNameRef = React.useRef<string | undefined>(
@@ -197,6 +206,10 @@ export function LeadWizard({
         referredBy: "",
         referredByClientId: "",
         referredByType: "fresh", // default to fresh client
+        mTokenOption: "without",
+        mTokenSerialNumber: "",
+        mTokenStoreFilter: "",
+        mTokenAvailableList: [],
       }
     }
 
@@ -244,6 +257,11 @@ export function LeadWizard({
       referredBy: initialLead.referredBy || "",
       referredByClientId: initialLead.referredByClientId || "",
       referredByType,
+      // Initializing MToken fields from existing lead if available
+      mTokenOption: initialLead.mTokenOption || "without",
+      mTokenSerialNumber: initialLead.mTokenSerialNumber || "",
+      mTokenStoreFilter: initialLead.mTokenStoreFilter || "",
+      mTokenAvailableList: initialLead.mTokenAvailableList || [],
     }
   }, [initialLead, productOptions])
 
@@ -303,6 +321,8 @@ export function LeadWizard({
       dispatch(fetchUsers() as any).catch(() => {})
       dispatch(fetchProducts() as any).catch(() => {})
       dispatch(fetchLeads() as any).catch(() => {}) // fetchLeads is now correctly imported and used
+      dispatch(fetchStores() as any).catch(() => {})
+      dispatch(fetchMTokenSerialNumbers() as any).catch(() => {})
     }
   }, [open, dispatch])
 
@@ -348,6 +368,15 @@ export function LeadWizard({
     if (!s2.productChoice || (s2.productChoice === "Other" && !s2.productCustomName?.trim())) {
       errs.productChoice = "Product is required"
       errs.productCustomName = s2.productChoice === "Other" ? "Enter product name" : undefined
+    }
+
+    if (s2.productChoice === "DSC" || s2.productCustomName?.toUpperCase().includes("DSC")) {
+      if (s2.mTokenOption === "with" && !s2.mTokenSerialNumber?.trim()) {
+        errs.mTokenSerialNumber = "MToken serial number is required"
+      }
+      if (s2.mTokenOption === "without" && !s2.orderId?.trim()) {
+        errs.orderId = "Order ID is required"
+      }
     }
 
     if (s2.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(s2.email)) errs.email = "Invalid email"
@@ -430,6 +459,15 @@ export function LeadWizard({
     } else if (s2.referredByType === "other" && s2.referredBy) {
       fd.append("referredByOtherName", s2.referredBy)
     }
+
+    // Append MToken fields to FormData if applicable
+    if (s2.productChoice === "DSC" || s2.productCustomName?.toUpperCase().includes("DSC")) {
+      fd.append("mTokenOption", s2.mTokenOption || "without")
+      if (s2.mTokenOption === "with") {
+        fd.append("mTokenSerialNumber", s2.mTokenSerialNumber || "")
+      }
+    }
+
 
     // Step 3
     fd.append("quotedPrice", String(Number(s3.quotedPrice ?? 0)))
@@ -772,6 +810,84 @@ export function LeadWizard({
                         <FieldError msg={e2.productCustomName} />
                       </div>
                     )}
+
+                    {(s2.productChoice === "DSC" || s2.productCustomName?.toUpperCase().includes("DSC")) && (
+                      <>
+                        <div className="space-y-2 md:col-span-2">
+                          <Label className="font-semibold">MToken Usage *</Label>
+                          <Select
+                            value={s2.mTokenOption || "without"}
+                            onValueChange={(v) =>
+                              setS2((p) => ({
+                                ...p,
+                                mTokenOption: v as "with" | "without",
+                                mTokenSerialNumber: "",
+                              }))
+                            }
+                          >
+                            <SelectTrigger className="w-full border-2 focus:border-primary bg-background">
+                              <SelectValue placeholder="Select option" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="with">With MToken</SelectItem>
+                              <SelectItem value="without">Without MToken</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+
+                        {s2.mTokenOption === "with" && (
+                          <>
+                            <div className="space-y-2 md:col-span-2">
+                              <Label htmlFor="mTokenSerialNumber" className="font-semibold">
+                                MToken Serial Number *
+                              </Label>
+                              <Select
+                                value={s2.mTokenSerialNumber || ""}
+                                onValueChange={(v) => setS2((p) => ({ ...p, mTokenSerialNumber: v }))}
+                              >
+                                <SelectTrigger className="w-full border-2 focus:border-primary bg-background">
+                                  <SelectValue placeholder="Select available MToken" />
+                                </SelectTrigger>
+                                <SelectContent className="max-h-48">
+                                  {serialNumbers
+                                    .filter((s: any) => !s.isUsed)
+                                    .map((serial: any) => (
+                                      <SelectItem key={serial.id} value={serial.serialNumber}>
+                                        <div className="flex flex-col">
+                                          <span className="font-mono font-bold">{serial.serialNumber}</span>
+                                          <span className="text-xs text-muted-foreground">
+                                            {stores.find((s: any) => s.id === serial.storeId)?.name} | {serial.purchaseDate}
+                                          </span>
+                                        </div>
+                                      </SelectItem>
+                                    ))}
+                                </SelectContent>
+                              </Select>
+                              <FieldError msg={e2.mTokenSerialNumber} />
+                            </div>
+                          </>
+                        )}
+
+                        {s2.mTokenOption === "without" && (
+                          <div className="space-y-2 md:col-span-2">
+                            <Label htmlFor="orderIdWithout" className="font-semibold">
+                              Order ID (Without MToken) *
+                            </Label>
+                            <Input
+                              id="orderIdWithout"
+                              type="text"
+                              value={s2.orderId}
+                              onChange={(e) => setS2((p) => ({ ...p, orderId: e.target.value }))}
+                              placeholder="Enter order ID for tracking without MToken"
+                              className="border-2 focus:border-primary"
+                            />
+                            <p className="text-xs text-muted-foreground">Enter the order ID for tracking DSC without MToken</p>
+                            <FieldError msg={e2.orderId} />
+                          </div>
+                        )}
+                      </>
+                    )}
+
 
                     <div className="space-y-2">
                       <Label className="font-semibold">Assign Team Member *</Label>

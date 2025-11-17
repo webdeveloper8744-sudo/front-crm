@@ -15,6 +15,9 @@ import {
   FiUserPlus,
   FiX,
   FiBarChart,
+  FiBox,
+  FiTag,
+  FiShoppingCart,
 } from "react-icons/fi"
 import { useAppDispatch, useAppSelector } from "@/store/hooks"
 import { fetchNotificationCount } from "@/store/slices/notificationSlice"
@@ -32,6 +35,9 @@ const items: Array<{
   { key: "assignments", label: "Assignments", icon: FiUserPlus, roles: ["admin", "manager", "employee"] },
   { key: "users", label: "Users & Roles", icon: FiShield, roles: ["admin", "manager"] },
   { key: "products", label: "Products", icon: FiPackage, roles: ["admin", "manager", "employee"] },
+  { key: "stores", label: "Stores", icon: FiShoppingCart, roles: ["admin", "manager"] },
+  { key: "purchase-orders", label: "Purchase Orders", icon: FiBox, roles: ["admin", "manager"] },
+  { key: "mtoken-tracking", label: "MToken Tracking", icon: FiTag, roles: ["admin", "manager"] },
   { key: "reports", label: "Reports", icon: FiBarChart, roles: ["admin", "manager"] },
 ]
 
@@ -65,8 +71,8 @@ export function Sidebar({
   }, [dispatch, isInitialized, user])
 
   const visibleItems = items.filter((item) => {
-    if (!item.roles) return true // Show items without role restrictions to everyone
-    if (!user) return false // Hide role-restricted items if no user
+    if (!item.roles) return true
+    if (!user) return false
     return item.roles.includes(user.role)
   })
 

@@ -11,10 +11,24 @@ import { ReportsPage } from "@/components/reports/reports-page"
 import LoginPage from "@/components/auth/login-page"
 import DashboardPage from "./components/pages/dashboard-page"
 import { LeadAssignmentsPage } from "./components/lead-assignments/lead-assignments-page"
+import { PurchaseOrderPage } from "@/components/mgmt/purchase-order-page"
+import { MTokenTrackingPage } from "@/components/mgmt/mtoken-tracking-page"
+import { StoresPage } from "@/components/mgmt/stores-page"
 import { toast } from "sonner"
 
 const isValidRoute = (route: string): route is RouteKey => {
-  return ["dashboard", "leads", "assignments", "users", "products", "settings", "reports"].includes(route)
+  return [
+    "dashboard",
+    "leads",
+    "assignments",
+    "users",
+    "products",
+    "settings",
+    "reports",
+    "purchase-orders",
+    "mtoken-tracking",
+    "stores",
+  ].includes(route)
 }
 
 export default function App() {
@@ -48,6 +62,8 @@ export default function App() {
     const hash = window.location.hash.slice(1) as RouteKey
     if (isValidRoute(hash)) {
       setRoute(hash)
+    } else {
+      setRoute("dashboard")
     }
 
     const handleHashChange = () => {
@@ -102,6 +118,9 @@ export default function App() {
       {route === "users" && <UsersRolesPage />}
       {route === "products" && <ProductsPage />}
       {route === "reports" && <ReportsPage />}
+      {route === "purchase-orders" && <PurchaseOrderPage />}
+      {route === "mtoken-tracking" && <MTokenTrackingPage />}
+      {route === "stores" && <StoresPage />}
     </AppShell>
   )
 }

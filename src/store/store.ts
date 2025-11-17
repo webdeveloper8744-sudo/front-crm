@@ -2,9 +2,11 @@ import { configureStore } from "@reduxjs/toolkit"
 import authReducer from "./slices/authSlice"
 import userReducer from "./slices/userSlice"
 import productReducer from "./slices/productSlice"
-import leadReducer from "./slices/leadSlice" //
+import leadReducer from "./slices/leadSlice"
 import leadAssignmentReducer from "./slices/leadAssignmentSlice"
 import notificationReducer from "./slices/notificationSlice"
+import purchaseOrderReducer from "./slices/purchaseOrderSlice"
+import storeReducer from "./slices/storeSlice"
 
 export const store = configureStore({
   reducer: {
@@ -12,8 +14,10 @@ export const store = configureStore({
     user: userReducer,
     product: productReducer,
     lead: leadReducer,
-    leadAssignment: leadAssignmentReducer, // Add lead assignment reducer
+    leadAssignment: leadAssignmentReducer,
     notification: notificationReducer,
+    purchaseOrder: purchaseOrderReducer,
+    store: storeReducer,
   },
 })
 
