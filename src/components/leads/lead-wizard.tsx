@@ -12,22 +12,26 @@ import { FiUser, FiClipboard, FiDollarSign } from "react-icons/fi"
 import { useAppDispatch, useAppSelector } from "@/store/hooks"
 import { fetchUsers } from "@/store/slices/userSlice"
 import { fetchProducts } from "@/store/slices/productSlice"
-import { createLead, updateLead, fetchLeads } from "@/store/slices/leadSlice" // fetchLeads imported here
+import { createLead, updateLead, fetchLeads } from "@/store/slices/leadSlice"
 import { fetchStores } from "@/store/slices/storeSlice"
 import { fetchMTokenSerialNumbers } from "@/store/slices/purchaseOrderSlice"
 
 type Stage = "Lead" | "Contacted" | "Qualified" | "Proposal Made" | "Won" | "Lost" | "Fridge"
+
+const ALLOWED_PDF_TYPES = ["application/pdf"]
+const ALLOWED_IMAGE_TYPES = ["image/jpeg", "image/jpg", "image/png", "image/webp", "image/avif"]
+const MAX_FILE_SIZE = 5 * 1024 * 1024 // 5MB
 
 type Step1Values = {
   employeeName: string
   source: "Survey" | "Facebook" | "Website" | "Other"
   otherSource?: string
   leadCreatedAt: string
-  expectedCloseDate?: string // NEW
+  expectedCloseDate?: string
   lastContactedAt?: string
-  stage?: Stage // NEW
+  stage?: Stage
   comment?: string
-  remarks?: string // NEW
+  remarks?: string
 }
 
 type Step2Values = {
@@ -56,7 +60,7 @@ type Step2Values = {
   processedAt: string
   referredBy?: string
   referredByClientId?: string
-  referredByType?: "fresh" | "existing" | "other" // added referral type tracking
+  referredByType?: "fresh" | "existing" | "other"
   mTokenOption?: "with" | "without"
   mTokenSerialNumber?: string
   mTokenStoreFilter?: string
@@ -106,7 +110,6 @@ export function LeadWizard({
   const { items: allLeads } = useAppSelector((s) => s.lead || { items: [] })
   const { stores } = useAppSelector((s) => s.store || { stores: [] })
   const { serialNumbers } = useAppSelector((s) => s.purchaseOrder || { serialNumbers: [] })
-
 
   const appliedProductDefaultRef = React.useRef(false)
   const initialLeadProductNameRef = React.useRef<string | undefined>(
@@ -326,12 +329,27 @@ export function LeadWizard({
     }
   }, [open, dispatch])
 
+  const validateFile = (file: File | undefined, fieldName: string, allowedTypes: string[]): string | undefined => {
+    if (!file) return undefined
+
+    if (!allowedTypes.includes(file.type)) {
+      const typeStr = allowedTypes.includes("application/pdf") ? "PDF" : "JPG, PNG, WebP, or AVIF image"
+      return `Invalid file type. ${fieldName} must be ${typeStr}.`
+    }
+
+    if (file.size > MAX_FILE_SIZE) {
+      return `File size exceeds 5MB limit. ${fieldName} is ${(file.size / 1024 / 1024).toFixed(2)}MB.`
+    }
+
+    return undefined
+  }
+
   function onNext1() {
     const errs: Step1Errors = {}
-    if (!s1.employeeName?.trim()) errs.employeeName = "Employee name is required"
-    if (!s1.leadCreatedAt) errs.leadCreatedAt = "Creation date is required"
-    if (s1.source === "Other" && !s1.otherSource?.trim()) errs.otherSource = "Please specify the source"
-    if (!s1.stage) errs.stage = "Stage is required" // validate stage
+    if (!s1.employeeName?.trim()) errs.employeeName = "Please fill this field."
+    if (!s1.leadCreatedAt) errs.leadCreatedAt = "Please fill this field."
+    if (s1.source === "Other" && !s1.otherSource?.trim()) errs.otherSource = "Please specify the source."
+    if (!s1.stage) errs.stage = "Please fill this field." // validate stage
     // expectedCloseDate optional; remarks optional
 
     setE1(errs)
@@ -362,25 +380,37 @@ export function LeadWizard({
     ]
     required.forEach((k) => {
       const v = s2[k] as unknown as string | undefined
-      if (!v || !v.toString().trim()) errs[k] = "Required"
+      if (!v || !v.toString().trim()) errs[k] = "Please fill this field."
     })
 
     if (!s2.productChoice || (s2.productChoice === "Other" && !s2.productCustomName?.trim())) {
-      errs.productChoice = "Product is required"
-      errs.productCustomName = s2.productChoice === "Other" ? "Enter product name" : undefined
+      errs.productChoice = "Product is required."
+      errs.productCustomName = s2.productChoice === "Other" ? "Enter product name." : undefined
     }
 
     if (s2.productChoice === "DSC" || s2.productCustomName?.toUpperCase().includes("DSC")) {
       if (s2.mTokenOption === "with" && !s2.mTokenSerialNumber?.trim()) {
-        errs.mTokenSerialNumber = "MToken serial number is required"
+        errs.mTokenSerialNumber = "MToken serial number is required."
       }
       if (s2.mTokenOption === "without" && !s2.orderId?.trim()) {
-        errs.orderId = "Order ID is required"
+        errs.orderId = "Order ID is required."
       }
     }
 
-    if (s2.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(s2.email)) errs.email = "Invalid email"
-    if (s2.phone && s2.phone.replace(/\D/g, "").length < 8) errs.phone = "Invalid phone"
+    if (s2.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(s2.email)) errs.email = "Email format is incorrect."
+    if (s2.phone && s2.phone.replace(/\D/g, "").length < 8) errs.phone = "Invalid phone number."
+
+    const aadhaarErr = validateFile(s2.aadhaarPdf, "Aadhaar PDF", ALLOWED_PDF_TYPES)
+    if (aadhaarErr) errs.aadhaarPdf = aadhaarErr
+
+    const panErr = validateFile(s2.panPdf, "PAN PDF", ALLOWED_PDF_TYPES)
+    if (panErr) errs.panPdf = panErr
+
+    const optionalErr = validateFile(s2.optionalPdf, "Optional PDF", ALLOWED_PDF_TYPES)
+    if (optionalErr) errs.optionalPdf = optionalErr
+
+    const imageErr = validateFile(s2.clientImage, "Client Image", ALLOWED_IMAGE_TYPES)
+    if (imageErr) errs.clientImage = imageErr
 
     setE2(errs)
     if (Object.keys(errs).length) {
@@ -397,10 +427,10 @@ export function LeadWizard({
   function onFinish() {
     const errs: Step3Errors = {}
     if (s3.quotedPrice == null || isNaN(Number(s3.quotedPrice)) || Number(s3.quotedPrice) < 0) {
-      errs.quotedPrice = "Quoted price must be >= 0"
+      errs.quotedPrice = "Quoted price must be >= 0."
     }
     if (s3.discountAmount < 0) {
-      errs.discountAmount = "Discount cannot be negative"
+      errs.discountAmount = "Discount cannot be negative."
     }
 
     const composedCompanyNameAddress =
@@ -408,11 +438,15 @@ export function LeadWizard({
         ? [s3.companyName?.trim(), s3.companyNameAddress?.trim()].filter(Boolean).join("\n")
         : ""
     if (!composedCompanyNameAddress) {
-      errs.companyNameAddress = "Company name/address is required"
+      errs.companyNameAddress = "Please fill this field."
     }
     if (s3.paymentStatusChoice === "other" && !s3.paymentStatusOther?.trim()) {
-      errs.paymentStatusOther = "Enter custom payment status"
+      errs.paymentStatusOther = "Enter custom payment status."
     }
+
+    const billDocErr = validateFile(s3.billDoc, "Billing Document", ALLOWED_PDF_TYPES)
+    if (billDocErr) errs.billDoc = billDocErr
+
     setE3(errs)
     if (Object.keys(errs).length) {
       toast.error("Fix errors in Billing details")
@@ -454,8 +488,8 @@ export function LeadWizard({
     if (s2.clientImage) fd.append("clientImage", s2.clientImage)
     fd.append("referredByType", s2.referredByType || "fresh")
     if (s2.referredByType === "existing" && s2.referredByClientId) {
-      fd.append("referredByClientId", s2.referredByClientId || '')
-      fd.append("referredByClientName", s2.referredBy || '')
+      fd.append("referredByClientId", s2.referredByClientId || "")
+      fd.append("referredByClientName", s2.referredBy || "")
     } else if (s2.referredByType === "other" && s2.referredBy) {
       fd.append("referredByOtherName", s2.referredBy)
     }
@@ -468,11 +502,11 @@ export function LeadWizard({
       }
     }
 
-
     // Step 3
     fd.append("quotedPrice", String(Number(s3.quotedPrice ?? 0)))
     if (s3.companyName) fd.append("companyName", s3.companyName)
     fd.append("companyNameAddress", composedCompanyNameAddress)
+    fd.append("paymentStatus", s3.paymentStatusChoice)
     if (s3.paymentStatusChoice === "other" && s3.paymentStatusOther) {
       fd.append("paymentStatusNote", s3.paymentStatusOther)
     }
@@ -856,7 +890,8 @@ export function LeadWizard({
                                         <div className="flex flex-col">
                                           <span className="font-mono font-bold">{serial.serialNumber}</span>
                                           <span className="text-xs text-muted-foreground">
-                                            {stores.find((s: any) => s.id === serial.storeId)?.name} | {serial.purchaseDate}
+                                            {stores.find((s: any) => s.id === serial.storeId)?.name} |{" "}
+                                            {serial.purchaseDate}
                                           </span>
                                         </div>
                                       </SelectItem>
@@ -881,13 +916,14 @@ export function LeadWizard({
                               placeholder="Enter order ID for tracking without MToken"
                               className="border-2 focus:border-primary"
                             />
-                            <p className="text-xs text-muted-foreground">Enter the order ID for tracking DSC without MToken</p>
+                            <p className="text-xs text-muted-foreground">
+                              Enter the order ID for tracking DSC without MToken
+                            </p>
                             <FieldError msg={e2.orderId} />
                           </div>
                         )}
                       </>
                     )}
-
 
                     <div className="space-y-2">
                       <Label className="font-semibold">Assign Team Member *</Label>
@@ -914,7 +950,7 @@ export function LeadWizard({
                     </div>
 
                     <div className="space-y-2">
-                      <Label htmlFor="aadhaarPdf">Aadhaar (PDF)</Label>
+                      <Label htmlFor="aadhaarPdf">Aadhaar (PDF) - Optional</Label>
                       {initialLead?.aadhaarPdfUrl && !s2.aadhaarPdf && (
                         <div className="text-xs text-muted-foreground mb-1">
                           Current:{" "}
@@ -935,10 +971,14 @@ export function LeadWizard({
                         onChange={(e) => setS2((p) => ({ ...p, aadhaarPdf: e.target.files?.[0] }))}
                         className="border-2 focus:border-primary"
                       />
-                      <p className="text-xs text-muted-foreground">Upload new file to replace existing</p>
+                      <p className="text-xs text-muted-foreground">
+                        PDF only, max 5MB. Upload new file to replace existing.
+                      </p>
+                      <FieldError msg={e2.aadhaarPdf} />
                     </div>
+
                     <div className="space-y-2">
-                      <Label htmlFor="panPdf">PAN (PDF)</Label>
+                      <Label htmlFor="panPdf">PAN (PDF) - Optional</Label>
                       {initialLead?.panPdfUrl && !s2.panPdf && (
                         <div className="text-xs text-muted-foreground mb-1">
                           Current:{" "}
@@ -959,10 +999,14 @@ export function LeadWizard({
                         onChange={(e) => setS2((p) => ({ ...p, panPdf: e.target.files?.[0] }))}
                         className="border-2 focus:border-primary"
                       />
-                      <p className="text-xs text-muted-foreground">Upload new file to replace existing</p>
+                      <p className="text-xs text-muted-foreground">
+                        PDF only, max 5MB. Upload new file to replace existing.
+                      </p>
+                      <FieldError msg={e2.panPdf} />
                     </div>
+
                     <div className="space-y-2">
-                      <Label htmlFor="optionalPdf">Optional Docs (PDF)</Label>
+                      <Label htmlFor="optionalPdf">Optional Docs (PDF) - Optional</Label>
                       {initialLead?.optionalPdfUrl && !s2.optionalPdf && (
                         <div className="text-xs text-muted-foreground mb-1">
                           Current:{" "}
@@ -983,10 +1027,14 @@ export function LeadWizard({
                         onChange={(e) => setS2((p) => ({ ...p, optionalPdf: e.target.files?.[0] }))}
                         className="border-2 focus:border-primary"
                       />
-                      <p className="text-xs text-muted-foreground">Upload new file to replace existing</p>
+                      <p className="text-xs text-muted-foreground">
+                        PDF only, max 5MB. Upload new file to replace existing.
+                      </p>
+                      <FieldError msg={e2.optionalPdf} />
                     </div>
+
                     <div className="space-y-2">
-                      <Label htmlFor="clientImage">Client Image</Label>
+                      <Label htmlFor="clientImage">Client Image - Optional</Label>
                       {initialLead?.clientImageUrl && !s2.clientImage && (
                         <div className="text-xs text-muted-foreground mb-1">
                           Current:{" "}
@@ -1007,7 +1055,10 @@ export function LeadWizard({
                         onChange={(e) => setS2((p) => ({ ...p, clientImage: e.target.files?.[0] }))}
                         className="border-2 focus:border-primary"
                       />
-                      <p className="text-xs text-muted-foreground">Upload new image to replace existing</p>
+                      <p className="text-xs text-muted-foreground">
+                        JPG, PNG, WebP, or AVIF, max 5MB. Upload new image to replace existing.
+                      </p>
+                      <FieldError msg={e2.clientImage} />
                     </div>
 
                     <div className="space-y-2">
@@ -1366,8 +1417,8 @@ export function LeadWizard({
                       />
                     </div>
 
-                    <div className="space-y-2 md:col-span-2">
-                      <Label htmlFor="billDoc">Bill Docs Upload</Label>
+                    <div className="space-y-2">
+                      <Label htmlFor="billDoc">Billing Document (PDF) - Optional</Label>
                       {initialLead?.billDocUrl && !s3.billDoc && (
                         <div className="text-xs text-muted-foreground mb-1">
                           Current:{" "}
@@ -1377,7 +1428,7 @@ export function LeadWizard({
                             rel="noopener noreferrer"
                             className="text-primary hover:underline"
                           >
-                            View existing document
+                            View existing file
                           </a>
                         </div>
                       )}
@@ -1388,7 +1439,10 @@ export function LeadWizard({
                         onChange={(e) => setS3((p) => ({ ...p, billDoc: e.target.files?.[0] }))}
                         className="border-2 focus:border-primary"
                       />
-                      <p className="text-xs text-muted-foreground">Upload new file to replace existing</p>
+                      <p className="text-xs text-muted-foreground">
+                        PDF only, max 5MB. Upload new file to replace existing.
+                      </p>
+                      <FieldError msg={e3.billDoc} />
                     </div>
                   </CardContent>
                 </Card>
@@ -1465,5 +1519,5 @@ function StepItem({ index, step, label }: { index: number; step: number; label: 
 
 function FieldError({ msg }: { msg?: string }) {
   if (!msg) return null
-  return <p className="mt-1 text-xs text-destructive">{msg}</p>
+  return <p className="mt-1 text-xs text-destructive font-medium">{msg}</p>
 }
