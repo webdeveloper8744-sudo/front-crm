@@ -2,7 +2,7 @@
 
 // 🔹 Define both backend servers
 const SERVERS = [
-  "https://backend-lwcx.onrender.com", // Main full backend
+  "https://nodecrm.wiremail.in", // Main full backend
   "https://crm-up7m.onrender.com",     // Secondary backup backend
 ]
 
