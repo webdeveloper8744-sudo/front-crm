@@ -4,7 +4,6 @@ import { toast } from "sonner"
 import type { RootState } from "../store"
 import { API_CONFIG } from "@/config/api"
 
-
 export interface UserData {
   profileImage: string
   fullName: string
@@ -72,11 +71,12 @@ export const addUser = createAsyncThunk("user/addUser", async (formData: FormDat
     const response = await axios.post(`${API_CONFIG.AUTH}/add-user`, formData, {
       headers: {
         Authorization: `Bearer ${token}`,
+        // Content-Type will be automatically set by axios with boundary for FormData
       },
     })
 
     toast.success("User added successfully!")
-    return response.data.user // Return the user object from response
+    return response.data.user
   } catch (error: any) {
     const message = error.response?.data?.error || "Failed to add user"
     toast.error(message)
@@ -100,6 +100,7 @@ export const updateUser = createAsyncThunk(
       const response = await axios.put(`${API_CONFIG.USERS}/${payload.id}`, payload.formData, {
         headers: {
           Authorization: `Bearer ${token}`,
+          // Content-Type will be automatically set by axios with boundary for FormData
         },
       })
 
