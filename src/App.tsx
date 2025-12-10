@@ -14,7 +14,8 @@ import { LeadAssignmentsPage } from "./components/lead-assignments/lead-assignme
 import { PurchaseOrderPage } from "@/components/mgmt/purchase-order-page"
 import { MTokenTrackingPage } from "@/components/mgmt/mtoken-tracking-page"
 import { StoresPage } from "@/components/mgmt/stores-page"
-import CompaniesTable from "@/components/mgmt/company-page"
+// import CompaniesTable from "@/components/mgmt/company-page"
+import ManageCompanyPage from "./components/mgmt/manage-company"
 import { toast } from "sonner"
 
 const isValidRoute = (route: string): route is RouteKey => {
@@ -123,7 +124,7 @@ export default function App() {
       {route === "purchase-orders" && <PurchaseOrderPage />}
       {route === "mtoken-tracking" && <MTokenTrackingPage />}
       {route === "stores" && <StoresPage />}
-      {route === "manage-company" && <CompaniesTable />}
+      {route === "manage-company" && <ManageCompanyPage />}
     </AppShell>
   )
 }

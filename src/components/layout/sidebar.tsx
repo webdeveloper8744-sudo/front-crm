@@ -144,7 +144,7 @@ export function Sidebar({
 
       <div className="px-3 py-3 border-t-2 border-sidebar-border">
         <div className={cn("text-xs text-sidebar-foreground/70 text-center", compact && "sr-only")}>
-          Powered by VIPL
+          Powered by VIPL (V.1.0.0)
         </div>
       </div>
     </nav>

@@ -16,6 +16,8 @@ import { createLead, updateLead, fetchLeads } from "@/store/slices/leadSlice"
 import { fetchStores } from "@/store/slices/storeSlice"
 import { fetchMTokenSerialNumbers } from "@/store/slices/purchaseOrderSlice"
 import { useSelector } from "react-redux" // Import useSelector
+import { fetchServices } from "@/store/slices/serviceSlice"
+import { fetchCompanies } from "@/store/slices/companySlice"
 
 type Stage = "Lead" | "Contacted" | "Qualified" | "Proposal Made" | "Won" | "Lost" | "Fridge"
 
@@ -95,6 +97,19 @@ type Step1Errors = Partial<Record<keyof Step1Values, string>>
 type Step2Errors = Partial<Record<keyof Step2Values, string>>
 type Step3Errors = Partial<Record<keyof Step3Values, string>>
 
+function Step2ErrorAlert({ errors }: { errors: Step2Errors }) {
+  const errorCount = Object.keys(errors).length
+  if (errorCount === 0) return null
+
+  return (
+    <div className="mb-4 p-3 rounded-md bg-destructive/10 border border-destructive/20">
+      <p className="text-sm font-medium text-destructive">
+        Fix {errorCount} error{errorCount > 1 ? "s" : ""} to proceed
+      </p>
+    </div>
+  )
+}
+
 export function LeadWizard({
   open,
   onOpenChange,
@@ -113,6 +128,7 @@ export function LeadWizard({
   const dispatch = useAppDispatch()
   const { users } = useAppSelector((s) => s.user || { users: [] })
   const { products } = useAppSelector((s) => s.product || { products: [] })
+  const { services } = useAppSelector((s) => s.service || { services: [] }) // added services from redux
   const { items: allLeads } = useAppSelector((s) => s.lead || { items: [] })
   const { stores } = useAppSelector((s) => s.store || { stores: [] })
   const { serialNumbers } = useAppSelector((s) => s.purchaseOrder || { serialNumbers: [] })
@@ -356,14 +372,33 @@ export function LeadWizard({
   const [e3, setE3] = React.useState<Step3Errors>({})
 
   React.useEffect(() => {
+    dispatch(fetchCompanies() as any)
+    dispatch(fetchServices() as any)
+  }, [dispatch])
+
+  React.useEffect(() => {
     if (open) {
       dispatch(fetchUsers() as any).catch(() => {})
       dispatch(fetchProducts() as any).catch(() => {})
+      // dispatch(fetchServices() as any).catch(() => {}) // fetch services in real-time - REMOVED as it's now in a separate useEffect
       dispatch(fetchLeads() as any).catch(() => {}) // fetchLeads is now correctly imported and used
       dispatch(fetchStores() as any).catch(() => {})
       dispatch(fetchMTokenSerialNumbers() as any).catch(() => {})
     }
   }, [open, dispatch])
+
+  React.useEffect(() => {
+    if (s2.clientCompanyId && step === 3) {
+      const selectedCompany = companies.find((c: any) => c.id === s2.clientCompanyId)
+      if (selectedCompany && !s3.companyId) {
+        setS3((p) => ({
+          ...p,
+          companyId: s2.clientCompanyId,
+          companyName: selectedCompany.companyName,
+        }))
+      }
+    }
+  }, [step, s2.clientCompanyId, s3.companyId, companies])
 
   const validateFile = (file: File | undefined, fieldName: string, allowedTypes: string[]): string | undefined => {
     if (!file) return undefined
@@ -402,19 +437,29 @@ export function LeadWizard({
 
     const required: Array<keyof Step2Values> = [
       "clientName",
-      "clientCompanyName",
-      "assignTeamMember",
-      "email",
-      "phone",
       "orderId",
       "orderDate",
       "clientAddress",
       "clientKycId",
       "kycPin",
+      "downloadStatus",
       "processedBy",
       "processedAt",
     ]
+
+    if (!s2.clientCompanyId && !s2.clientCompanyOther?.trim()) {
+      errs.clientCompanyName = "Please select or enter a company"
+    }
+
     required.forEach((k) => {
+      if (k === "orderId") {
+        const isDSC = s2.productChoice === "DSC" || s2.productCustomName?.toUpperCase().includes("DSC")
+        if (!isDSC && (!s2.orderId || !s2.orderId.toString().trim())) {
+          errs.orderId = "Order ID is required for non-DSC products"
+        }
+        return
+      }
+
       const v = s2[k] as unknown as string | undefined
       if (!v || !v.toString().trim()) errs[k] = "Please fill this field."
     })
@@ -428,8 +473,8 @@ export function LeadWizard({
       if (s2.mTokenOption === "with" && !s2.mTokenSerialNumber?.trim()) {
         errs.mTokenSerialNumber = "MToken serial number is required."
       }
-      if (s2.mTokenOption === "without" && !s2.orderId?.trim()) {
-        errs.orderId = "Order ID is required."
+      if (s2.mTokenOption === "without" && !s2.mTokenOrderId?.trim()) {
+        errs.mTokenOrderId = "MToken Order ID is required."
       }
     }
 
@@ -453,8 +498,6 @@ export function LeadWizard({
       toast.error("Fix errors in Order/Client details")
       return
     }
-
-    setS3((prev) => (!prev.companyName ? { ...prev, companyName: s2.clientCompanyName } : prev))
 
     setStep(3)
     toast.success("Order/Client details validated")
@@ -752,6 +795,9 @@ export function LeadWizard({
                 <p className="mt-4 mb-3 text-xs uppercase tracking-wide text-muted-foreground font-semibold">
                   Order & Client Details
                 </p>
+
+                <Step2ErrorAlert errors={e2} />
+
                 <Card className="border-2 border-border shadow-sm">
                   <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-6">
                     <div className="space-y-2">
@@ -801,7 +847,7 @@ export function LeadWizard({
                           <SelectItem value="other">+ Other Company</SelectItem>
                         </SelectContent>
                       </Select>
-                      <FieldError msg={e2.clientCompanyId} />
+                      <FieldError msg={e2.clientCompanyName} />
                     </div>
 
                     {!s2.clientCompanyId && (
@@ -899,7 +945,7 @@ export function LeadWizard({
                     )}
 
                     <div className="space-y-2">
-                      <Label className="font-semibold">Product Name *</Label>
+                      <Label className="font-semibold">Product / Service *</Label>
                       <Select
                         value={s2.productChoice}
                         onValueChange={(v) => setS2((p) => ({ ...p, productChoice: v }))}
@@ -907,10 +953,15 @@ export function LeadWizard({
                         <SelectTrigger className="w-full border-2 focus:border-primary bg-background">
                           <SelectValue placeholder="Select product or service" />
                         </SelectTrigger>
-                        <SelectContent>
+                        <SelectContent className="max-h-48">
                           {productOptions.map((p) => (
                             <SelectItem key={p} value={p}>
                               {p}
+                            </SelectItem>
+                          ))}
+                          {services?.map((s: any) => (
+                            <SelectItem key={`service-${s.id}`} value={s.serviceName}>
+                              {s.serviceName}
                             </SelectItem>
                           ))}
                           <SelectItem value="Other">Other</SelectItem>
@@ -1015,23 +1066,24 @@ export function LeadWizard({
                       </>
                     )}
 
-                    {!(s2.productChoice === "DSC" || s2.productCustomName?.toUpperCase().includes("DSC")) ||
-                      (s2.mTokenOption === "with" && (
-                        <div className="space-y-2 md:col-span-2">
-                          <Label htmlFor="orderId" className="font-semibold">
-                            Order ID *
-                          </Label>
-                          <Input
-                            id="orderId"
-                            type="text"
-                            value={s2.orderId}
-                            onChange={(e) => setS2((p) => ({ ...p, orderId: e.target.value }))}
-                            placeholder="Enter order ID"
-                            className="border-2 focus:border-primary"
-                          />
-                          <FieldError msg={e2.orderId} />
-                        </div>
-                      ))}
+                    {(s2.productChoice === "DSC" ||
+                      s2.productCustomName?.toUpperCase().includes("DSC") ||
+                      s2.mTokenOption === "with") && ( // This condition was incorrectly placed inside the DSC block previously
+                      <div className="space-y-2 md:col-span-2">
+                        <Label htmlFor="orderId" className="font-semibold">
+                          Order ID *
+                        </Label>
+                        <Input
+                          id="orderId"
+                          type="text"
+                          value={s2.orderId}
+                          onChange={(e) => setS2((p) => ({ ...p, orderId: e.target.value }))}
+                          placeholder="Enter order ID"
+                          className="border-2 focus:border-primary"
+                        />
+                        <FieldError msg={e2.orderId} />
+                      </div>
+                    )}
 
                     <div className="space-y-2">
                       <Label htmlFor="orderDate" className="font-semibold">
@@ -1136,6 +1188,185 @@ export function LeadWizard({
                         className="border-2 focus:border-primary"
                       />
                       <FieldError msg={e2.processedAt} />
+                    </div>
+
+                    {/* Assign Team Member Field */}
+                    <div className="space-y-2">
+                      <Label className="font-semibold">Assign Team Member *</Label>
+                      <Select
+                        value={s2.assignTeamMember}
+                        onValueChange={(v) => setS2((p) => ({ ...p, assignTeamMember: v }))}
+                      >
+                        <SelectTrigger className="w-full border-2 focus:border-primary bg-background">
+                          <SelectValue placeholder="Select team member" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {users?.length ? (
+                            users.map((u: any) => (
+                              <SelectItem key={u.id} value={u.fullName}>
+                                {u.fullName}
+                              </SelectItem>
+                            ))
+                          ) : (
+                            <SelectItem value="No users">No users</SelectItem>
+                          )}
+                        </SelectContent>
+                      </Select>
+                      <FieldError msg={e2.assignTeamMember} />
+                    </div>
+
+                    {/* Email Field */}
+                    <div className="space-y-2">
+                      <Label htmlFor="email" className="font-semibold">
+                        Email *
+                      </Label>
+                      <Input
+                        id="email"
+                        type="email"
+                        value={s2.email}
+                        onChange={(e) => setS2((p) => ({ ...p, email: e.target.value }))}
+                        placeholder="client@example.com"
+                        className="border-2 focus:border-primary"
+                      />
+                      <FieldError msg={e2.email} />
+                    </div>
+
+                    {/* Phone Field */}
+                    <div className="space-y-2">
+                      <Label htmlFor="phone" className="font-semibold">
+                        Phone *
+                      </Label>
+                      <Input
+                        id="phone"
+                        type="tel"
+                        value={s2.phone}
+                        onChange={(e) => setS2((p) => ({ ...p, phone: e.target.value }))}
+                        placeholder="+91 XXXXX XXXXX"
+                        className="border-2 focus:border-primary"
+                      />
+                      <FieldError msg={e2.phone} />
+                    </div>
+
+                    {/* File Upload Section */}
+                    <div className="md:col-span-2 space-y-6 border-t-2 border-border pt-6 mt-6">
+                      <div>
+                        <h4 className="text-sm font-semibold mb-4 text-muted-foreground uppercase tracking-wide">
+                          Document Uploads (Optional)
+                        </h4>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          {/* Aadhaar PDF Upload */}
+                          <div className="space-y-2">
+                            <Label htmlFor="aadhaarPdf" className="font-semibold">
+                              Aadhaar PDF
+                            </Label>
+                            {initialLead?.aadhaarPdfUrl && !s2.aadhaarPdf && (
+                              <div className="text-xs text-muted-foreground mb-2">
+                                <a
+                                  href={initialLead.aadhaarPdfUrl}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="text-primary hover:underline"
+                                >
+                                  View existing file
+                                </a>
+                              </div>
+                            )}
+                            <Input
+                              id="aadhaarPdf"
+                              type="file"
+                              accept="application/pdf"
+                              onChange={(e) => setS2((p) => ({ ...p, aadhaarPdf: e.target.files?.[0] }))}
+                              className="border-2 focus:border-primary"
+                            />
+                            <p className="text-xs text-muted-foreground">PDF only, max 5MB</p>
+                            <FieldError msg={e2.aadhaarPdf} />
+                          </div>
+
+                          {/* PAN Card PDF Upload */}
+                          <div className="space-y-2">
+                            <Label htmlFor="panPdf" className="font-semibold">
+                              PAN Card PDF
+                            </Label>
+                            {initialLead?.panPdfUrl && !s2.panPdf && (
+                              <div className="text-xs text-muted-foreground mb-2">
+                                <a
+                                  href={initialLead.panPdfUrl}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="text-primary hover:underline"
+                                >
+                                  View existing file
+                                </a>
+                              </div>
+                            )}
+                            <Input
+                              id="panPdf"
+                              type="file"
+                              accept="application/pdf"
+                              onChange={(e) => setS2((p) => ({ ...p, panPdf: e.target.files?.[0] }))}
+                              className="border-2 focus:border-primary"
+                            />
+                            <p className="text-xs text-muted-foreground">PDF only, max 5MB</p>
+                            <FieldError msg={e2.panPdf} />
+                          </div>
+
+                          {/* Optional PDF Upload */}
+                          <div className="space-y-2">
+                            <Label htmlFor="optionalPdf" className="font-semibold">
+                              Optional PDF
+                            </Label>
+                            {initialLead?.optionalPdfUrl && !s2.optionalPdf && (
+                              <div className="text-xs text-muted-foreground mb-2">
+                                <a
+                                  href={initialLead.optionalPdfUrl}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="text-primary hover:underline"
+                                >
+                                  View existing file
+                                </a>
+                              </div>
+                            )}
+                            <Input
+                              id="optionalPdf"
+                              type="file"
+                              accept="application/pdf"
+                              onChange={(e) => setS2((p) => ({ ...p, optionalPdf: e.target.files?.[0] }))}
+                              className="border-2 focus:border-primary"
+                            />
+                            <p className="text-xs text-muted-foreground">PDF only, max 5MB</p>
+                            <FieldError msg={e2.optionalPdf} />
+                          </div>
+
+                          {/* Client Image Upload */}
+                          <div className="space-y-2">
+                            <Label htmlFor="clientImage" className="font-semibold">
+                              Client Image
+                            </Label>
+                            {initialLead?.clientImageUrl && !s2.clientImage && (
+                              <div className="text-xs text-muted-foreground mb-2">
+                                <a
+                                  href={initialLead.clientImageUrl}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="text-primary hover:underline"
+                                >
+                                  View existing file
+                                </a>
+                              </div>
+                            )}
+                            <Input
+                              id="clientImage"
+                              type="file"
+                              accept="image/*"
+                              onChange={(e) => setS2((p) => ({ ...p, clientImage: e.target.files?.[0] }))}
+                              className="border-2 focus:border-primary"
+                            />
+                            <p className="text-xs text-muted-foreground">JPG, PNG, WebP. Max 5MB</p>
+                            <FieldError msg={e2.clientImage} />
+                          </div>
+                        </div>
+                      </div>
                     </div>
                   </CardContent>
                 </Card>

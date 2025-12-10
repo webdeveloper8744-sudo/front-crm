@@ -12,7 +12,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Label } from "@/components/ui/label"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { FiEdit2, FiTrash2, FiFilter, FiDownload } from "react-icons/fi"
+import { FiEdit2, FiFilter, FiDownload } from "react-icons/fi"
 import { toast } from "sonner"
 import { exportToCSV, formatAssignedLeadsForExport } from "@/utils/csvExport"
 
@@ -314,9 +314,7 @@ function AssignmentsTable({
   leads,
   isLoading,
   onUpdate,
-  onDelete,
   canEdit = true,
-  canDelete = true,
 }: {
   leads: AssignedLead[]
   isLoading: boolean
@@ -371,16 +369,6 @@ function AssignmentsTable({
                     {canEdit && (
                       <Button size="icon" variant="ghost" onClick={() => onUpdate(lead)} className="size-8">
                         <FiEdit2 className="size-4" />
-                      </Button>
-                    )}
-                    {canDelete && (
-                      <Button
-                        size="icon"
-                        variant="ghost"
-                        onClick={() => onDelete(lead.id)}
-                        className="size-8 text-destructive hover:text-destructive"
-                      >
-                        <FiTrash2 className="size-4" />
                       </Button>
                     )}
                   </div>

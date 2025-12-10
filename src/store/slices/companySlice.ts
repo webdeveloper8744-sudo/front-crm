@@ -4,59 +4,48 @@ import { toast } from "sonner"
 import type { RootState } from "../store"
 import { API_CONFIG } from "@/config/api"
 
-export interface CompanyDirector {
-  id?: string
-  fullName: string
-  dinNumber: string
-  phoneNumber: string
-  email: string
-  panNumber: string
-  aadhaarNumber: string
-}
-
-export interface CompanyEmployee {
-  id?: string
-  fullName: string
-  phoneNumber: string
-  email: string
-  designation: string
-}
-
 export interface CompanyData {
   id: string
   companyName: string
   cinNumber: string
-  registeredAddress: string
+  registerAddress: string
   alternateAddress?: string
-  gstNumber: string
+  gstNo: string
   registeredMailId: string
-  dinAlphanumeric: string
-  post: string
-  phoneNumber?: string
+  phoneNumber: string
+  post: "director" | "manager" | "accounts"
+  directorFullName?: string
+  dinNumber?: string
+  directorPhone?: string
+  directorEmail?: string
+  panNumber?: string
+  aadhaarNumber?: string
+  contactFullName?: string
+  contactPhone?: string
+  contactEmail?: string
   createdAt: string
   updatedAt?: string
 }
 
 interface CompanyState {
   companies: CompanyData[]
-  currentCompany: (CompanyData & { directors: CompanyDirector[]; employees: CompanyEmployee[] }) | null
   isLoading: boolean
   error: string | null
 }
 
 const initialState: CompanyState = {
   companies: [],
-  currentCompany: null,
   isLoading: false,
   error: null,
 }
 
+// Helper function to get auth token
 const getAuthToken = (state: RootState) => {
   return state.auth.token || localStorage.getItem("crm_token")
 }
 
 // Fetch all companies
-export const fetchCompanies = createAsyncThunk("company/fetchAll", async (_, { rejectWithValue, getState }) => {
+export const fetchCompanies = createAsyncThunk("company/fetchCompanies", async (_, { rejectWithValue, getState }) => {
   try {
     const state = getState() as RootState
     const token = getAuthToken(state)
@@ -65,7 +54,7 @@ export const fetchCompanies = createAsyncThunk("company/fetchAll", async (_, { r
       return rejectWithValue("No authentication token")
     }
 
-    const response = await axios.get(`${API_CONFIG.BASE_URL}/companies`, {
+    const response = await axios.get(`${API_CONFIG.COMPANIES}`, {
       headers: {
         Authorization: `Bearer ${token}`,
       },
@@ -79,52 +68,10 @@ export const fetchCompanies = createAsyncThunk("company/fetchAll", async (_, { r
   }
 })
 
-// Fetch single company
-export const fetchCompanyById = createAsyncThunk(
-  "company/fetchById",
-  async (id: string, { rejectWithValue, getState }) => {
-    try {
-      const state = getState() as RootState
-      const token = getAuthToken(state)
-
-      if (!token) {
-        return rejectWithValue("No authentication token")
-      }
-
-      const response = await axios.get(`${API_CONFIG.BASE_URL}/companies/${id}`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      })
-
-      return response.data
-    } catch (error: any) {
-      const message = error.response?.data?.error || "Failed to fetch company"
-      toast.error(message)
-      return rejectWithValue(message)
-    }
-  },
-)
-
-// Create company
+// Add new company
 export const addCompany = createAsyncThunk(
-  "company/add",
-  async (
-    payload: {
-      companyName: string
-      cinNumber: string
-      registeredAddress: string
-      alternateAddress?: string
-      gstNumber: string
-      registeredMailId: string
-      dinAlphanumeric: string
-      post: string
-      phoneNumber?: string
-      director?: CompanyDirector
-      employee?: CompanyEmployee
-    },
-    { rejectWithValue, getState },
-  ) => {
+  "company/addCompany",
+  async (data: Partial<CompanyData>, { rejectWithValue, getState }) => {
     try {
       const state = getState() as RootState
       const token = getAuthToken(state)
@@ -134,16 +81,16 @@ export const addCompany = createAsyncThunk(
         return rejectWithValue("No authentication token")
       }
 
-      const response = await axios.post(`${API_CONFIG.BASE_URL}/companies`, payload, {
+      const response = await axios.post(`${API_CONFIG.COMPANIES}`, data, {
         headers: {
           Authorization: `Bearer ${token}`,
         },
       })
 
-      toast.success("Company created successfully!")
+      toast.success("Company added successfully!")
       return response.data.company
     } catch (error: any) {
-      const message = error.response?.data?.error || "Failed to create company"
+      const message = error.response?.data?.error || "Failed to add company"
       toast.error(message)
       return rejectWithValue(message)
     }
@@ -151,25 +98,9 @@ export const addCompany = createAsyncThunk(
 )
 
 // Update company
-export const updateCompany = createAsyncThunk(
-  "company/update",
-  async (
-    payload: {
-      id: string
-      companyName: string
-      cinNumber: string
-      registeredAddress: string
-      alternateAddress?: string
-      gstNumber: string
-      registeredMailId: string
-      dinAlphanumeric: string
-      post: string
-      phoneNumber?: string
-      director?: CompanyDirector
-      employee?: CompanyEmployee
-    },
-    { rejectWithValue, getState },
-  ) => {
+export const updateCompanyData = createAsyncThunk(
+  "company/updateCompany",
+  async (payload: { id: string; data: Partial<CompanyData> }, { rejectWithValue, getState }) => {
     try {
       const state = getState() as RootState
       const token = getAuthToken(state)
@@ -179,7 +110,7 @@ export const updateCompany = createAsyncThunk(
         return rejectWithValue("No authentication token")
       }
 
-      const response = await axios.put(`${API_CONFIG.BASE_URL}/companies/${payload.id}`, payload, {
+      const response = await axios.put(`${API_CONFIG.COMPANIES}/${payload.id}`, payload.data, {
         headers: {
           Authorization: `Bearer ${token}`,
         },
@@ -196,30 +127,33 @@ export const updateCompany = createAsyncThunk(
 )
 
 // Delete company
-export const deleteCompany = createAsyncThunk("company/delete", async (id: string, { rejectWithValue, getState }) => {
-  try {
-    const state = getState() as RootState
-    const token = getAuthToken(state)
+export const deleteCompanyData = createAsyncThunk(
+  "company/deleteCompany",
+  async (id: string, { rejectWithValue, getState }) => {
+    try {
+      const state = getState() as RootState
+      const token = getAuthToken(state)
 
-    if (!token) {
-      toast.error("No authentication token found. Please login again.")
-      return rejectWithValue("No authentication token")
+      if (!token) {
+        toast.error("No authentication token found. Please login again.")
+        return rejectWithValue("No authentication token")
+      }
+
+      await axios.delete(`${API_CONFIG.COMPANIES}/${id}`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      })
+
+      toast.success("Company deleted successfully!")
+      return id
+    } catch (error: any) {
+      const message = error.response?.data?.error || "Failed to delete company"
+      toast.error(message)
+      return rejectWithValue(message)
     }
-
-    await axios.delete(`${API_CONFIG.BASE_URL}/companies/${id}`, {
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
-    })
-
-    toast.success("Company deleted successfully!")
-    return id
-  } catch (error: any) {
-    const message = error.response?.data?.error || "Failed to delete company"
-    toast.error(message)
-    return rejectWithValue(message)
-  }
-})
+  },
+)
 
 const companySlice = createSlice({
   name: "company",
@@ -228,13 +162,13 @@ const companySlice = createSlice({
     clearError: (state) => {
       state.error = null
     },
-    clearCurrentCompany: (state) => {
-      state.currentCompany = null
+    clearCompanies: (state) => {
+      state.companies = []
     },
   },
   extraReducers: (builder) => {
     builder
-      // Fetch all
+      // Fetch companies
       .addCase(fetchCompanies.pending, (state) => {
         state.isLoading = true
         state.error = null
@@ -247,20 +181,7 @@ const companySlice = createSlice({
         state.isLoading = false
         state.error = action.payload as string
       })
-      // Fetch by ID
-      .addCase(fetchCompanyById.pending, (state) => {
-        state.isLoading = true
-        state.error = null
-      })
-      .addCase(fetchCompanyById.fulfilled, (state, action) => {
-        state.isLoading = false
-        state.currentCompany = action.payload
-      })
-      .addCase(fetchCompanyById.rejected, (state, action) => {
-        state.isLoading = false
-        state.error = action.payload as string
-      })
-      // Add
+      // Add company
       .addCase(addCompany.pending, (state) => {
         state.isLoading = true
         state.error = null
@@ -273,37 +194,37 @@ const companySlice = createSlice({
         state.isLoading = false
         state.error = action.payload as string
       })
-      // Update
-      .addCase(updateCompany.pending, (state) => {
+      // Update company
+      .addCase(updateCompanyData.pending, (state) => {
         state.isLoading = true
         state.error = null
       })
-      .addCase(updateCompany.fulfilled, (state, action) => {
+      .addCase(updateCompanyData.fulfilled, (state, action) => {
         state.isLoading = false
         const index = state.companies.findIndex((c) => c.id === action.payload.id)
         if (index !== -1) {
           state.companies[index] = action.payload
         }
       })
-      .addCase(updateCompany.rejected, (state, action) => {
+      .addCase(updateCompanyData.rejected, (state, action) => {
         state.isLoading = false
         state.error = action.payload as string
       })
-      // Delete
-      .addCase(deleteCompany.pending, (state) => {
+      // Delete company
+      .addCase(deleteCompanyData.pending, (state) => {
         state.isLoading = true
         state.error = null
       })
-      .addCase(deleteCompany.fulfilled, (state, action) => {
+      .addCase(deleteCompanyData.fulfilled, (state, action) => {
         state.isLoading = false
         state.companies = state.companies.filter((c) => c.id !== action.payload)
       })
-      .addCase(deleteCompany.rejected, (state, action) => {
+      .addCase(deleteCompanyData.rejected, (state, action) => {
         state.isLoading = false
         state.error = action.payload as string
       })
   },
 })
 
-export const { clearError, clearCurrentCompany } = companySlice.actions
+export const { clearError, clearCompanies } = companySlice.actions
 export default companySlice.reducer

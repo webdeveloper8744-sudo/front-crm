@@ -140,9 +140,24 @@ export function LeadViewDialog({
     }
   }
 
-  const companyDisplay = billing.companyName
-    ? `${billing.companyName} | ${billing.companyNameAddress || ""}`
-    : billing.companyNameAddress || "—"
+
+  const getCompanyAddress = () => {
+    const order = lead.order || lead
+    if (order.clientAddress && order.clientAddress.trim()) {
+      return order.clientAddress
+    }
+    // If not, use client address from order as fallback
+    if (order.clientAddress && order.clientAddress.trim()) {
+      return order.clientAddress
+    }
+    return "—"
+  }
+
+  const companyDisplay = lead?.clientCompanyName
+    ? `${lead.clientCompanyName}`
+    : billing.companyName
+      ? `${billing.companyName}`
+      : "—"
 
   const handleDownloadPdf = async (url: string, filename: string) => {
     if (!url) return
@@ -419,7 +434,22 @@ export function LeadViewDialog({
                           <DetailItem label="Payment Note" value={billing.paymentStatusNote} />
                         )}
                         <div className="sm:col-span-2 lg:col-span-3">
-                          <DetailItem label="Company Name & Address" value={companyDisplay} className="break-words" />
+                          <div className="space-y-1">
+                            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                              Company & Address
+                            </p>
+                            <p className="text-sm text-foreground break-words whitespace-pre-line">
+                              {companyDisplay && companyDisplay !== "—" ? (
+                                <>
+                                  <span className="font-semibold">{companyDisplay}</span>
+                                  <br />
+                                  {getCompanyAddress()}
+                                </>
+                              ) : (
+                                getCompanyAddress()
+                              )}
+                            </p>
+                          </div>
                         </div>
                         {billing.referenceBy && <DetailItem label="Reference By" value={billing.referenceBy} />}
                         {billing.invoiceNumber && (
@@ -606,16 +636,16 @@ export function LeadViewDialog({
 function DetailItem({
   label,
   value,
-  className,
+  className = "",
 }: {
   label: string
   value: React.ReactNode
   className?: string
 }) {
   return (
-    <div className="space-y-1 min-w-0">
+    <div className="space-y-1">
       <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">{label}</p>
-      <p className={`text-sm break-words ${className || ""}`}>{value}</p>
+      <p className={`text-sm text-foreground break-words ${className}`}>{value}</p>
     </div>
   )
 }
