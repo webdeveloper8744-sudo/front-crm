@@ -89,6 +89,7 @@ export function LeadViewDialog({
     optionalPdfUrl: lead.optionalPdfUrl,
     mTokenOption: lead.mTokenOption,
     mTokenSerialNumber: lead.mTokenSerialNumber,
+    mTokenOrderId: lead.mTokenOrderId,
   }
 
   const billing = lead.billing || {
@@ -344,22 +345,25 @@ export function LeadViewDialog({
                         <h3 className="text-base sm:text-lg font-semibold">Order Information</h3>
                       </div>
                       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4 p-3 sm:p-4 rounded-lg bg-muted/50 border border-border/50">
-                        {product.productName?.toUpperCase().includes("DSC") && (
+                        {order.mTokenOption === "with" && (
                           <>
-                            <DetailItem
-                              label="MToken Usage"
-                              value={order.mTokenOption === "with" ? "With MToken" : "Without MToken"}
-                            />
-                            {order.mTokenOption === "with" && (
-                              <DetailItem label="MToken Serial Number" value={order.mTokenSerialNumber || "—"} />
-                            )}
+                            <DetailItem label="MToken Usage" value="With MToken" />
+                            <DetailItem label="MToken Serial Number" value={order.mTokenSerialNumber || "—"} />
                           </>
+                        )}
+
+                        {order.mTokenOption === "without" && order.mTokenOrderId && (
+                          <DetailItem
+                            label="MToken Order ID"
+                            value={order.mTokenOrderId}
+                            className="font-semibold text-primary"
+                          />
                         )}
 
                         <DetailItem label="Order ID" value={order.orderId || "—"} className="font-semibold" />
                         <DetailItem label="Order Date" value={fmtDate(order.orderDate)} />
                         <DetailItem label="Client KYC ID" value={order.clientKycId || "—"} />
-                        <DetailItem label="KYC PIN" value={order.kycPin ? "••••••••" : "—"} />
+                        <DetailItem label="KYC PIN" value={order.kycPin ? order.kycPin : "—"} />
                         <DetailItem
                           label="Download Status"
                           value={

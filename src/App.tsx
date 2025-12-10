@@ -6,7 +6,7 @@ import { initializeAuth, clearAuth, checkTokenValidity } from "@/store/slices/au
 import { AppShell, type RouteKey } from "@/components/layout/app-shell"
 import { LeadsPage } from "@/components/leads/leads-page"
 import { UsersRolesPage } from "@/components/users/users-roles-page"
-import { ProductsPage } from "@/components/mgmt/products-page"
+import { ProductsServicesPage } from "@/components/mgmt/products-services-page"
 import { ReportsPage } from "@/components/reports/reports-page"
 import LoginPage from "@/components/auth/login-page"
 import DashboardPage from "./components/pages/dashboard-page"
@@ -14,6 +14,7 @@ import { LeadAssignmentsPage } from "./components/lead-assignments/lead-assignme
 import { PurchaseOrderPage } from "@/components/mgmt/purchase-order-page"
 import { MTokenTrackingPage } from "@/components/mgmt/mtoken-tracking-page"
 import { StoresPage } from "@/components/mgmt/stores-page"
+import CompaniesTable from "@/components/mgmt/company-page"
 import { toast } from "sonner"
 
 const isValidRoute = (route: string): route is RouteKey => {
@@ -28,6 +29,7 @@ const isValidRoute = (route: string): route is RouteKey => {
     "purchase-orders",
     "mtoken-tracking",
     "stores",
+    "manage-company",
   ].includes(route)
 }
 
@@ -116,11 +118,12 @@ export default function App() {
       {route === "leads" && <LeadsPage />}
       {route === "assignments" && <LeadAssignmentsPage />}
       {route === "users" && <UsersRolesPage />}
-      {route === "products" && <ProductsPage />}
+      {route === "products" && <ProductsServicesPage />}
       {route === "reports" && <ReportsPage />}
       {route === "purchase-orders" && <PurchaseOrderPage />}
       {route === "mtoken-tracking" && <MTokenTrackingPage />}
       {route === "stores" && <StoresPage />}
+      {route === "manage-company" && <CompaniesTable />}
     </AppShell>
   )
 }

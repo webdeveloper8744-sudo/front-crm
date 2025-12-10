@@ -102,13 +102,14 @@ export const updateStore = createAsyncThunk(
 
       console.log("[v0] Updating store:", payload)
 
-      const response = await axios.put(`${API_CONFIG.BASE_URL}/store/update/${payload.id}`, 
+      const response = await axios.put(
+        `${API_CONFIG.BASE_URL}/store/update/${payload.id}`,
         { name: payload.name, description: payload.description },
         {
           headers: {
             Authorization: `Bearer ${token}`,
           },
-        }
+        },
       )
 
       console.log("[v0] Store updated:", response.data)
@@ -124,37 +125,35 @@ export const updateStore = createAsyncThunk(
 )
 
 // Delete store
-export const deleteStore = createAsyncThunk(
-  "store/delete",
-  async (id: string, { rejectWithValue, getState }) => {
-    try {
-      const state = getState() as RootState
-      const token = getAuthToken(state)
+export const deleteStore = createAsyncThunk("store/delete", async (id: string, { rejectWithValue, getState }) => {
+  try {
+    const state = getState() as RootState
+    const token = getAuthToken(state)
 
-      if (!token) {
-        toast.error("No authentication token found. Please login again.")
-        return rejectWithValue("No authentication token")
-      }
-
-      console.log("[v0] Deleting store:", id)
-
-      await axios.delete(`${API_CONFIG.BASE_URL}/store/delete/${id}`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      })
-
-      console.log("[v0] Store deleted successfully")
-      toast.success("Store deleted successfully!")
-      return id
-    } catch (error: any) {
-      const message = error.response?.data?.error || error.message || "Failed to delete store"
-      console.error("[v0] Failed to delete store:", message)
-      toast.error(message)
-      return rejectWithValue(message)
+    if (!token) {
+      toast.error("No authentication token found. Please login again.")
+      return rejectWithValue("No authentication token")
     }
-  },
-)
+
+    console.log("[v0] Deleting store:", id)
+
+    await axios.delete(`${API_CONFIG.BASE_URL}/store/delete/${id}`, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    })
+
+    console.log("[v0] Store deleted successfully")
+    toast.success("Store deleted successfully!")
+    return id
+  } catch (error: any) {
+    const message =
+      error.response?.data?.details || error.response?.data?.error || error.message || "Failed to delete store"
+    console.error("[v0] Failed to delete store:", message)
+    toast.error(message)
+    return rejectWithValue(message)
+  }
+})
 
 const storeSlice = createSlice({
   name: "store",

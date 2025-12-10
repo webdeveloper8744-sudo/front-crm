@@ -3,7 +3,7 @@
 // 🔹 Define both backend servers
 const SERVERS = [
   "https://nodecrm.wiremail.in", // Main full backend
-  "https://crm-up7m.onrender.com",     // Secondary backup backend
+  "https://crm-up7m.onrender.com", // Secondary backup backend
 ]
 
 // 🔹 Automatically detect environment and select API base URL
@@ -35,10 +35,12 @@ export const API_CONFIG = {
   USERS: `${API_BASE_URL}/users`,
   LEADS: `${API_BASE_URL}/leads`,
   PRODUCTS: `${API_BASE_URL}/products`,
+  SERVICES: `${API_BASE_URL}/services`,
   ASSIGNMENTS: `${API_BASE_URL}/lead-assignments`,
   NOTIFICATIONS: `${API_BASE_URL}/notifications`,
   STORES: `${API_BASE_URL}/store`,
   PURCHASE_ORDERS: `${API_BASE_URL}/purchase-orders`,
+  COMPANIES: `${API_BASE_URL}/companies`,
 }
 
 // Helper: For file/image URLs

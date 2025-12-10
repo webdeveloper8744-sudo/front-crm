@@ -82,7 +82,10 @@ export const fetchPurchaseOrders = createAsyncThunk(
 // Create purchase order
 export const createPurchaseOrder = createAsyncThunk(
   "purchaseOrder/create",
-  async (payload: { storeId: string; quantity: number; amount: number; purchaseDate: string; serialNumbers: string[] }, { rejectWithValue, getState }) => {
+  async (
+    payload: { storeId: string; quantity: number; amount: number; purchaseDate: string; serialNumbers: string[] },
+    { rejectWithValue, getState },
+  ) => {
     try {
       const state = getState() as RootState
       const token = getAuthToken(state)
@@ -192,6 +195,35 @@ export const markMTokenAsUsed = createAsyncThunk(
   },
 )
 
+// Delete purchase order
+export const deletePurchaseOrder = createAsyncThunk(
+  "purchaseOrder/delete",
+  async (id: string, { rejectWithValue, getState }) => {
+    try {
+      const state = getState() as RootState
+      const token = getAuthToken(state)
+
+      if (!token) {
+        toast.error("No authentication token found. Please login again.")
+        return rejectWithValue("No authentication token")
+      }
+
+      await axios.delete(`${API_CONFIG.BASE_URL}/purchase-orders/${id}`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      })
+
+      toast.success("Purchase order deleted successfully!")
+      return id
+    } catch (error: any) {
+      const message = error.response?.data?.error || "Failed to delete purchase order"
+      toast.error(message)
+      return rejectWithValue(message)
+    }
+  },
+)
+
 const purchaseOrderSlice = createSlice({
   name: "purchaseOrder",
   initialState,
@@ -244,6 +276,19 @@ const purchaseOrderSlice = createSlice({
       // Search serial numbers
       .addCase(searchMTokenSerialNumbers.fulfilled, (state, action) => {
         state.serialNumbers = action.payload
+      })
+      // Delete purchase order
+      .addCase(deletePurchaseOrder.pending, (state) => {
+        state.isLoading = true
+        state.error = null
+      })
+      .addCase(deletePurchaseOrder.fulfilled, (state, action) => {
+        state.isLoading = false
+        state.orders = state.orders.filter((o) => o.id !== action.payload)
+      })
+      .addCase(deletePurchaseOrder.rejected, (state, action) => {
+        state.isLoading = false
+        state.error = action.payload as string
       })
   },
 })

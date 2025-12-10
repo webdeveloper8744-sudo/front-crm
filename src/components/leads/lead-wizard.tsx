@@ -15,6 +15,7 @@ import { fetchProducts } from "@/store/slices/productSlice"
 import { createLead, updateLead, fetchLeads } from "@/store/slices/leadSlice"
 import { fetchStores } from "@/store/slices/storeSlice"
 import { fetchMTokenSerialNumbers } from "@/store/slices/purchaseOrderSlice"
+import { useSelector } from "react-redux" // Import useSelector
 
 type Stage = "Lead" | "Contacted" | "Qualified" | "Proposal Made" | "Won" | "Lost" | "Fridge"
 
@@ -45,12 +46,15 @@ type Step2Values = {
   clientImageUrl?: string
   clientName: string
   clientCompanyName: string
+  clientCompanyId?: string // Add company ID for managed companies
+  clientCompanyOther?: string // Add custom company name for "Other" option
   productChoice: string
   productCustomName?: string
   assignTeamMember: string
   email: string
   phone: string
   orderId: string
+  mTokenOrderId?: string // Separate MToken Order ID field
   orderDate: string
   clientAddress: string
   clientKycId: string
@@ -69,7 +73,9 @@ type Step2Values = {
 
 type Step3Values = {
   quotedPrice: number
-  companyName: string
+  companyName?: string // Make optional, use managed company dropdown
+  companyId?: string // Add managed company ID reference
+  companyOther?: string // Custom company for "Other"
   companyNameAddress: string
   paymentStatus: string
   paymentStatusChoice: "paid" | "pending" | "failed" | "other"
@@ -110,6 +116,8 @@ export function LeadWizard({
   const { items: allLeads } = useAppSelector((s) => s.lead || { items: [] })
   const { stores } = useAppSelector((s) => s.store || { stores: [] })
   const { serialNumbers } = useAppSelector((s) => s.purchaseOrder || { serialNumbers: [] })
+
+  const companies = useSelector((state: any) => state.company?.companies || [])
 
   const appliedProductDefaultRef = React.useRef(false)
   const initialLeadProductNameRef = React.useRef<string | undefined>(
@@ -193,12 +201,15 @@ export function LeadWizard({
       return {
         clientName: "",
         clientCompanyName: "",
+        clientCompanyId: "",
+        clientCompanyOther: "",
         productChoice: productOptions[0] || "Other",
         productCustomName: "",
         assignTeamMember: "",
         email: "",
         phone: "",
         orderId: "",
+        mTokenOrderId: "", // Initialize MToken Order ID
         orderDate: new Date().toISOString().slice(0, 10),
         clientAddress: "",
         clientKycId: "",
@@ -237,15 +248,27 @@ export function LeadWizard({
       referredByType = "other"
     }
 
+    let clientCompanyId = ""
+    let clientCompanyOther = ""
+    const managedCompany = companies.find((c: any) => c.id === initialLead.clientCompanyId)
+    if (managedCompany) {
+      clientCompanyId = managedCompany.id
+    } else {
+      clientCompanyOther = initialLead.clientCompanyName || ""
+    }
+
     return {
       clientName: order.clientName || "",
       clientCompanyName: order.clientCompanyName || "",
+      clientCompanyId, // Set managed company ID
+      clientCompanyOther, // Set custom company
       productChoice,
       productCustomName,
       assignTeamMember: order.assignTeamMember || "",
       email: order.email || "",
       phone: order.phone || "",
       orderId: order.orderId || "",
+      mTokenOrderId: initialLead.mTokenOrderId || "", // Restore MToken Order ID
       orderDate: order.orderDate || new Date().toISOString().slice(0, 10),
       clientAddress: order.clientAddress || "",
       clientKycId: order.clientKycId || "",
@@ -266,13 +289,15 @@ export function LeadWizard({
       mTokenStoreFilter: initialLead.mTokenStoreFilter || "",
       mTokenAvailableList: initialLead.mTokenAvailableList || [],
     }
-  }, [initialLead, productOptions])
+  }, [initialLead, productOptions, companies])
 
   const initialS3: Step3Values = React.useMemo(() => {
     if (!initialLead) {
       return {
         quotedPrice: 0,
         companyName: "",
+        companyId: "",
+        companyOther: "",
         companyNameAddress: "",
         paymentStatus: "pending",
         paymentStatusChoice: "pending",
@@ -289,9 +314,20 @@ export function LeadWizard({
     const billing = initialLead.billing || initialLead
     const paymentStat = billing.paymentStatus || "pending"
 
+    let companyId = ""
+    let companyOther = ""
+    const managedCompany = companies.find((c: any) => c.id === initialLead.clientCompanyId)
+    if (managedCompany) {
+      companyId = managedCompany.id
+    } else {
+      companyOther = billing.companyName || (billing.companyNameAddress?.split("\n")?.[0] ?? "")
+    }
+
     return {
       quotedPrice: Number(billing.quotedPrice || 0),
       companyName: billing.companyName || (billing.companyNameAddress?.split("\n")?.[0] ?? ""),
+      companyId, // Set managed company ID
+      companyOther, // Set custom company
       companyNameAddress: billing.companyNameAddress || "",
       paymentStatus: paymentStat,
       paymentStatusChoice: (["paid", "pending", "failed"].includes(paymentStat) ? paymentStat : "other") as
@@ -309,7 +345,7 @@ export function LeadWizard({
       discountType: (initialLead.discountType || "amount") as "amount" | "percentage",
       discountedPrice: Number(initialLead.discountedPrice || 0),
     }
-  }, [initialLead])
+  }, [initialLead, companies])
 
   const [s1, setS1] = React.useState<Step1Values>(initialS1)
   const [s2, setS2] = React.useState<Step2Values>(initialS2)
@@ -470,11 +506,17 @@ export function LeadWizard({
     // Step 2
     fd.append("clientName", s2.clientName)
     fd.append("clientCompanyName", s2.clientCompanyName)
+    // Append company ID and custom company name
+    if (s2.clientCompanyId) fd.append("clientCompanyId", s2.clientCompanyId)
+    if (s2.clientCompanyOther) fd.append("clientCompanyOther", s2.clientCompanyOther)
+
     fd.append("productName", productName)
     fd.append("assignTeamMember", s2.assignTeamMember)
     fd.append("email", s2.email)
     fd.append("phone", s2.phone)
     fd.append("orderId", s2.orderId)
+    // Append MToken Order ID if applicable
+    if (s2.mTokenOrderId) fd.append("mTokenOrderId", s2.mTokenOrderId)
     fd.append("orderDate", s2.orderDate)
     fd.append("clientAddress", s2.clientAddress)
     fd.append("clientKycId", s2.clientKycId)
@@ -504,7 +546,9 @@ export function LeadWizard({
 
     // Step 3
     fd.append("quotedPrice", String(Number(s3.quotedPrice ?? 0)))
-    if (s3.companyName) fd.append("companyName", s3.companyName)
+    // Append company ID and custom company name for billing
+    if (s3.companyId) fd.append("companyId", s3.companyId)
+    if (s3.companyOther) fd.append("companyOther", s3.companyOther)
     fd.append("companyNameAddress", composedCompanyNameAddress)
     fd.append("paymentStatus", s3.paymentStatusChoice)
     if (s3.paymentStatusChoice === "other" && s3.paymentStatusOther) {
@@ -724,17 +768,62 @@ export function LeadWizard({
                     </div>
 
                     <div className="space-y-2">
-                      <Label htmlFor="clientCompanyName" className="font-semibold">
-                        Client Company Name *
-                      </Label>
-                      <Input
-                        id="clientCompanyName"
-                        value={s2.clientCompanyName}
-                        onChange={(e) => setS2((p) => ({ ...p, clientCompanyName: e.target.value }))}
-                        className="border-2 focus:border-primary"
-                      />
-                      <FieldError msg={e2.clientCompanyName} />
+                      <Label className="font-semibold">Client Company Name *</Label>
+                      <Select
+                        value={s2.clientCompanyId || "other"}
+                        onValueChange={(v) => {
+                          if (v === "other") {
+                            setS2((p) => ({ ...p, clientCompanyId: "", clientCompanyOther: "" }))
+                          } else {
+                            const company = companies.find((c: any) => c.id === v)
+                            setS2((p) => ({
+                              ...p,
+                              clientCompanyId: v,
+                              clientCompanyOther: "",
+                              clientCompanyName: company?.companyName || "",
+                            }))
+                          }
+                        }}
+                      >
+                        <SelectTrigger className="w-full border-2 focus:border-primary bg-background">
+                          <SelectValue placeholder="Select company" />
+                        </SelectTrigger>
+                        <SelectContent className="max-h-48">
+                          {companies.length > 0 ? (
+                            companies.map((company: any) => (
+                              <SelectItem key={company.id} value={company.id}>
+                                {company.companyName}
+                              </SelectItem>
+                            ))
+                          ) : (
+                            <SelectItem value="no-companies">No companies available</SelectItem>
+                          )}
+                          <SelectItem value="other">+ Other Company</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <FieldError msg={e2.clientCompanyId} />
                     </div>
+
+                    {!s2.clientCompanyId && (
+                      <div className="space-y-2">
+                        <Label htmlFor="clientCompanyOther" className="font-semibold">
+                          Enter Company Name *
+                        </Label>
+                        <Input
+                          id="clientCompanyOther"
+                          value={s2.clientCompanyOther}
+                          onChange={(e) => {
+                            setS2((p) => ({
+                              ...p,
+                              clientCompanyOther: e.target.value,
+                              clientCompanyName: e.target.value,
+                            }))
+                          }}
+                          placeholder="Enter custom company name"
+                          className="border-2 focus:border-primary"
+                        />
+                      </div>
+                    )}
 
                     <div className="space-y-2">
                       <Label className="font-semibold">Referred By (Client)</Label>
@@ -816,7 +905,7 @@ export function LeadWizard({
                         onValueChange={(v) => setS2((p) => ({ ...p, productChoice: v }))}
                       >
                         <SelectTrigger className="w-full border-2 focus:border-primary bg-background">
-                          <SelectValue placeholder="Select product" />
+                          <SelectValue placeholder="Select product or service" />
                         </SelectTrigger>
                         <SelectContent>
                           {productOptions.map((p) => (
@@ -856,6 +945,7 @@ export function LeadWizard({
                                 ...p,
                                 mTokenOption: v as "with" | "without",
                                 mTokenSerialNumber: "",
+                                mTokenOrderId: "", // Clear MToken Order ID when toggling
                               }))
                             }
                           >
@@ -905,202 +995,44 @@ export function LeadWizard({
 
                         {s2.mTokenOption === "without" && (
                           <div className="space-y-2 md:col-span-2">
-                            <Label htmlFor="orderIdWithout" className="font-semibold">
-                              Order ID (Without MToken) *
+                            <Label htmlFor="mTokenOrderId" className="font-semibold">
+                              MToken Order ID *
                             </Label>
                             <Input
-                              id="orderIdWithout"
+                              id="mTokenOrderId"
                               type="text"
-                              value={s2.orderId}
-                              onChange={(e) => setS2((p) => ({ ...p, orderId: e.target.value }))}
-                              placeholder="Enter order ID for tracking without MToken"
-                              className="border-2 focus:border-primary"
+                              value={s2.mTokenOrderId || ""}
+                              onChange={(e) => setS2((p) => ({ ...p, mTokenOrderId: e.target.value }))}
+                              placeholder="Enter unique MToken order ID"
+                              className="border-2 focus:border-primary bg-primary/5 border-primary/30"
                             />
-                            <p className="text-xs text-muted-foreground">
-                              Enter the order ID for tracking DSC without MToken
+                            <p className="text-xs text-muted-foreground font-semibold">
+                              This is a unique identifier for MToken tracking (separate from regular Order ID)
                             </p>
-                            <FieldError msg={e2.orderId} />
+                            <FieldError msg={e2.mTokenOrderId} />
                           </div>
                         )}
                       </>
                     )}
 
-                    <div className="space-y-2">
-                      <Label className="font-semibold">Assign Team Member *</Label>
-                      <Select
-                        value={s2.assignTeamMember}
-                        onValueChange={(v) => setS2((p) => ({ ...p, assignTeamMember: v }))}
-                      >
-                        <SelectTrigger className="w-full border-2 focus:border-primary bg-background">
-                          <SelectValue placeholder="Select team member" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {users?.length ? (
-                            users.map((u: any) => (
-                              <SelectItem key={u.id} value={u.fullName}>
-                                {u.fullName}
-                              </SelectItem>
-                            ))
-                          ) : (
-                            <SelectItem value="No users">No users</SelectItem>
-                          )}
-                        </SelectContent>
-                      </Select>
-                      <FieldError msg={e2.assignTeamMember} />
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label htmlFor="aadhaarPdf">Aadhaar (PDF) - Optional</Label>
-                      {initialLead?.aadhaarPdfUrl && !s2.aadhaarPdf && (
-                        <div className="text-xs text-muted-foreground mb-1">
-                          Current:{" "}
-                          <a
-                            href={initialLead.aadhaarPdfUrl}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-primary hover:underline"
-                          >
-                            View existing file
-                          </a>
+                    {!(s2.productChoice === "DSC" || s2.productCustomName?.toUpperCase().includes("DSC")) ||
+                      (s2.mTokenOption === "with" && (
+                        <div className="space-y-2 md:col-span-2">
+                          <Label htmlFor="orderId" className="font-semibold">
+                            Order ID *
+                          </Label>
+                          <Input
+                            id="orderId"
+                            type="text"
+                            value={s2.orderId}
+                            onChange={(e) => setS2((p) => ({ ...p, orderId: e.target.value }))}
+                            placeholder="Enter order ID"
+                            className="border-2 focus:border-primary"
+                          />
+                          <FieldError msg={e2.orderId} />
                         </div>
-                      )}
-                      <Input
-                        id="aadhaarPdf"
-                        type="file"
-                        accept="application/pdf"
-                        onChange={(e) => setS2((p) => ({ ...p, aadhaarPdf: e.target.files?.[0] }))}
-                        className="border-2 focus:border-primary"
-                      />
-                      <p className="text-xs text-muted-foreground">
-                        PDF only, max 5MB. Upload new file to replace existing.
-                      </p>
-                      <FieldError msg={e2.aadhaarPdf} />
-                    </div>
+                      ))}
 
-                    <div className="space-y-2">
-                      <Label htmlFor="panPdf">PAN (PDF) - Optional</Label>
-                      {initialLead?.panPdfUrl && !s2.panPdf && (
-                        <div className="text-xs text-muted-foreground mb-1">
-                          Current:{" "}
-                          <a
-                            href={initialLead.panPdfUrl}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-primary hover:underline"
-                          >
-                            View existing file
-                          </a>
-                        </div>
-                      )}
-                      <Input
-                        id="panPdf"
-                        type="file"
-                        accept="application/pdf"
-                        onChange={(e) => setS2((p) => ({ ...p, panPdf: e.target.files?.[0] }))}
-                        className="border-2 focus:border-primary"
-                      />
-                      <p className="text-xs text-muted-foreground">
-                        PDF only, max 5MB. Upload new file to replace existing.
-                      </p>
-                      <FieldError msg={e2.panPdf} />
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label htmlFor="optionalPdf">Optional Docs (PDF) - Optional</Label>
-                      {initialLead?.optionalPdfUrl && !s2.optionalPdf && (
-                        <div className="text-xs text-muted-foreground mb-1">
-                          Current:{" "}
-                          <a
-                            href={initialLead.optionalPdfUrl}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-primary hover:underline"
-                          >
-                            View existing file
-                          </a>
-                        </div>
-                      )}
-                      <Input
-                        id="optionalPdf"
-                        type="file"
-                        accept="application/pdf"
-                        onChange={(e) => setS2((p) => ({ ...p, optionalPdf: e.target.files?.[0] }))}
-                        className="border-2 focus:border-primary"
-                      />
-                      <p className="text-xs text-muted-foreground">
-                        PDF only, max 5MB. Upload new file to replace existing.
-                      </p>
-                      <FieldError msg={e2.optionalPdf} />
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label htmlFor="clientImage">Client Image - Optional</Label>
-                      {initialLead?.clientImageUrl && !s2.clientImage && (
-                        <div className="text-xs text-muted-foreground mb-1">
-                          Current:{" "}
-                          <a
-                            href={initialLead.clientImageUrl}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-primary hover:underline"
-                          >
-                            View existing image
-                          </a>
-                        </div>
-                      )}
-                      <Input
-                        id="clientImage"
-                        type="file"
-                        accept="image/jpeg,image/jpg,image/png,image/webp,image/avif"
-                        onChange={(e) => setS2((p) => ({ ...p, clientImage: e.target.files?.[0] }))}
-                        className="border-2 focus:border-primary"
-                      />
-                      <p className="text-xs text-muted-foreground">
-                        JPG, PNG, WebP, or AVIF, max 5MB. Upload new image to replace existing.
-                      </p>
-                      <FieldError msg={e2.clientImage} />
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label htmlFor="email" className="font-semibold">
-                        Email *
-                      </Label>
-                      <Input
-                        id="email"
-                        type="email"
-                        value={s2.email}
-                        onChange={(e) => setS2((p) => ({ ...p, email: e.target.value }))}
-                        className="border-2 focus:border-primary"
-                      />
-                      <FieldError msg={e2.email} />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="phone" className="font-semibold">
-                        Phone *
-                      </Label>
-                      <Input
-                        id="phone"
-                        type="tel"
-                        value={s2.phone}
-                        onChange={(e) => setS2((p) => ({ ...p, phone: e.target.value }))}
-                        className="border-2 focus:border-primary"
-                      />
-                      <FieldError msg={e2.phone} />
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label htmlFor="orderId" className="font-semibold">
-                        Order ID *
-                      </Label>
-                      <Input
-                        id="orderId"
-                        type="number"
-                        value={s2.orderId}
-                        onChange={(e) => setS2((p) => ({ ...p, orderId: e.target.value }))}
-                        className="border-2 focus:border-primary"
-                      />
-                      <FieldError msg={e2.orderId} />
-                    </div>
                     <div className="space-y-2">
                       <Label htmlFor="orderDate" className="font-semibold">
                         Order Date *
@@ -1308,30 +1240,76 @@ export function LeadWizard({
                     </div>
 
                     <div className="space-y-2">
-                      <Label htmlFor="companyName" className="font-semibold">
-                        Company Name *
-                      </Label>
-                      <Input
-                        id="companyName"
-                        value={s3.companyName}
-                        onChange={(e) => setS3((p) => ({ ...p, companyName: e.target.value }))}
-                        className="border-2 focus:border-primary"
-                      />
-                      <FieldError msg={e3.companyName} />
+                      <Label className="font-semibold">Company Name *</Label>
+                      <Select
+                        value={s3.companyId || "other"}
+                        onValueChange={(v) => {
+                          if (v === "other") {
+                            setS3((p) => ({ ...p, companyId: "", companyOther: "" }))
+                          } else {
+                            const company = companies.find((c: any) => c.id === v)
+                            setS3((p) => ({
+                              ...p,
+                              companyId: v,
+                              companyOther: "",
+                              companyName: company?.companyName || "",
+                            }))
+                          }
+                        }}
+                      >
+                        <SelectTrigger className="w-full border-2 focus:border-primary bg-background">
+                          <SelectValue placeholder="Select company" />
+                        </SelectTrigger>
+                        <SelectContent className="max-h-48">
+                          {companies.length > 0 ? (
+                            companies.map((company: any) => (
+                              <SelectItem key={company.id} value={company.id}>
+                                {company.companyName}
+                              </SelectItem>
+                            ))
+                          ) : (
+                            <SelectItem value="no-companies">No companies available</SelectItem>
+                          )}
+                          <SelectItem value="other">+ Other Company</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <FieldError msg={e3.companyId} />
                     </div>
 
-                    <div className="space-y-2 md:col-span-2">
+                    {!s3.companyId && (
+                      <div className="space-y-2">
+                        <Label htmlFor="companyOther" className="font-semibold">
+                          Enter Company Name *
+                        </Label>
+                        <Input
+                          id="companyOther"
+                          value={s3.companyOther || ""}
+                          onChange={(e) => {
+                            setS3((p) => ({
+                              ...p,
+                              companyOther: e.target.value,
+                              companyName: e.target.value,
+                            }))
+                          }}
+                          placeholder="Enter custom company name"
+                          className="border-2 focus:border-primary"
+                        />
+                      </div>
+                    )}
+
+                    {/* <div className="space-y-2 md:col-span-2">
                       <Label htmlFor="companyNameAddress" className="font-semibold">
-                        Company Name & Address *
+                        Company Address *
                       </Label>
                       <Textarea
                         id="companyNameAddress"
                         value={s3.companyNameAddress}
                         onChange={(e) => setS3((p) => ({ ...p, companyNameAddress: e.target.value }))}
                         className="border-2 focus:border-primary"
+                        placeholder="Enter complete company address"
                       />
                       <FieldError msg={e3.companyNameAddress} />
-                    </div>
+                    </div> */}
 
                     <div className="space-y-2">
                       <Label className="font-semibold">Payment Status *</Label>

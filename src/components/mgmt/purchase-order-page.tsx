@@ -8,18 +8,36 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
 import { toast } from "sonner"
 import { Plus, Trash2 } from "lucide-react"
 import { useAppDispatch, useAppSelector } from "@/store/hooks"
-import { fetchPurchaseOrders, createPurchaseOrder, fetchMTokenSerialNumbers } from "@/store/slices/purchaseOrderSlice"
+import {
+  fetchPurchaseOrders,
+  createPurchaseOrder,
+  fetchMTokenSerialNumbers,
+  deletePurchaseOrder,
+} from "@/store/slices/purchaseOrderSlice"
 import { fetchStores, type StoreData } from "@/store/slices/storeSlice"
 
 export function PurchaseOrderPage() {
   const dispatch = useAppDispatch()
   const { orders, isLoading } = useAppSelector((s) => s.purchaseOrder)
   const { stores } = useAppSelector((s) => s.store || { stores: [] })
+  const { user } = useAppSelector((s) => s.auth)
 
   const [open, setOpen] = React.useState(false)
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = React.useState(false)
+  const [orderToDelete, setOrderToDelete] = React.useState<any>(null)
   const [formData, setFormData] = React.useState({
     storeId: "",
     quantity: 1,
@@ -33,6 +51,28 @@ export function PurchaseOrderPage() {
     dispatch(fetchStores())
     dispatch(fetchMTokenSerialNumbers())
   }, [dispatch])
+
+  const handleDeleteClick = (order: any) => {
+    const canDelete = user?.role === "admin" || user?.role === "manager"
+    if (!canDelete) {
+      toast.error("You don't have permission to delete purchase orders")
+      return
+    }
+    setOrderToDelete(order)
+    setDeleteConfirmOpen(true)
+  }
+
+  const confirmDelete = async () => {
+    if (orderToDelete) {
+      try {
+        await dispatch(deletePurchaseOrder(orderToDelete.id)).unwrap()
+        setOrderToDelete(null)
+      } catch (error: any) {
+        console.error("[v0] Failed to delete purchase order:", error)
+      }
+    }
+    setDeleteConfirmOpen(false)
+  }
 
   const handleAddSerialNumber = () => {
     setFormData((prev) => ({
@@ -92,6 +132,8 @@ export function PurchaseOrderPage() {
     return stores.find((s: StoreData) => s.id === storeId)?.name || "Unknown Store"
   }
 
+  const canDelete = user?.role === "admin" || user?.role === "manager"
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -141,7 +183,7 @@ export function PurchaseOrderPage() {
                     type="number"
                     step="0.01"
                     value={formData.amount}
-                    onChange={(e) => setFormData((p) => ({ ...p, amount: parseFloat(e.target.value) || 0 }))}
+                    onChange={(e) => setFormData((p) => ({ ...p, amount: Number.parseFloat(e.target.value) || 0 }))}
                     placeholder="0.00"
                   />
                 </div>
@@ -188,7 +230,9 @@ export function PurchaseOrderPage() {
                   ))}
                 </div>
 
-                <div className="text-sm text-muted-foreground">Total: {formData.serialNumbers.length} serial numbers</div>
+                <div className="text-sm text-muted-foreground">
+                  Total: {formData.serialNumbers.length} serial numbers
+                </div>
               </div>
 
               <div className="flex gap-2 justify-end border-t pt-4">
@@ -218,12 +262,13 @@ export function PurchaseOrderPage() {
                   <TableHead>Amount (₹)</TableHead>
                   <TableHead>Purchase Date</TableHead>
                   <TableHead>Created At</TableHead>
+                  {canDelete && <TableHead className="text-right">Actions</TableHead>}
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {orders.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={5} className="text-center text-muted-foreground py-8">
+                    <TableCell colSpan={canDelete ? 6 : 5} className="text-center text-muted-foreground py-8">
                       No purchase orders found
                     </TableCell>
                   </TableRow>
@@ -235,6 +280,19 @@ export function PurchaseOrderPage() {
                       <TableCell>₹{Number(order.amount).toFixed(2)}</TableCell>
                       <TableCell>{order.purchaseDate}</TableCell>
                       <TableCell>{new Date(order.createdAt).toLocaleDateString("en-IN")}</TableCell>
+                      {canDelete && (
+                        <TableCell className="text-right">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleDeleteClick(order)}
+                            className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                            aria-label="Delete purchase order"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
+                        </TableCell>
+                      )}
                     </TableRow>
                   ))
                 )}
@@ -243,6 +301,30 @@ export function PurchaseOrderPage() {
           </div>
         </CardContent>
       </Card>
+
+      <AlertDialog open={deleteConfirmOpen} onOpenChange={setDeleteConfirmOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Purchase Order?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete this purchase order from{" "}
+              <span className="font-semibold">{orderToDelete ? storeName(orderToDelete.storeId) : ""}</span> with{" "}
+              <span className="font-semibold">{orderToDelete?.quantity} serial numbers</span>? This action cannot be
+              undone and will also delete all associated serial numbers and their records.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setOrderToDelete(null)}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmDelete}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              disabled={isLoading}
+            >
+              {isLoading ? "Deleting..." : "Delete Order"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }

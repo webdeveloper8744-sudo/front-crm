@@ -7,7 +7,17 @@ import React from "react"
 import { cn } from "@/lib/utils"
 import { Sheet, SheetContent } from "@/components/ui/sheet"
 
-export type RouteKey = "dashboard" | "leads" | "assignments" | "users" | "products" | "reports" | "purchase-orders" | "mtoken-tracking" | "stores"
+export type RouteKey =
+  | "dashboard"
+  | "leads"
+  | "assignments"
+  | "users"
+  | "products"
+  | "reports"
+  | "purchase-orders"
+  | "mtoken-tracking"
+  | "stores"
+  | "manage-company"
 
 type CurrentUser = {
   id: string
