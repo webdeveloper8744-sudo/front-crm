@@ -437,7 +437,6 @@ export function LeadWizard({
 
     const required: Array<keyof Step2Values> = [
       "clientName",
-      "orderId",
       "orderDate",
       "clientAddress",
       "clientKycId",
@@ -452,17 +451,14 @@ export function LeadWizard({
     }
 
     required.forEach((k) => {
-      if (k === "orderId") {
-        const isDSC = s2.productChoice === "DSC" || s2.productCustomName?.toUpperCase().includes("DSC")
-        if (!isDSC && (!s2.orderId || !s2.orderId.toString().trim())) {
-          errs.orderId = "Order ID is required for non-DSC products"
-        }
-        return
-      }
-
       const v = s2[k] as unknown as string | undefined
       if (!v || !v.toString().trim()) errs[k] = "Please fill this field."
     })
+
+    const isDSC = s2.productChoice === "DSC" || s2.productCustomName?.toUpperCase().includes("DSC")
+    if (isDSC && (!s2.orderId || !s2.orderId.toString().trim())) {
+      errs.orderId = "Order ID is required for DSC."
+    }
 
     if (!s2.productChoice || (s2.productChoice === "Other" && !s2.productCustomName?.trim())) {
       errs.productChoice = "Product is required."
@@ -1066,24 +1062,23 @@ export function LeadWizard({
                       </>
                     )}
 
-                    {(s2.productChoice === "DSC" ||
-                      s2.productCustomName?.toUpperCase().includes("DSC") ||
-                      s2.mTokenOption === "with") && ( // This condition was incorrectly placed inside the DSC block previously
-                      <div className="space-y-2 md:col-span-2">
-                        <Label htmlFor="orderId" className="font-semibold">
-                          Order ID *
-                        </Label>
-                        <Input
-                          id="orderId"
-                          type="text"
-                          value={s2.orderId}
-                          onChange={(e) => setS2((p) => ({ ...p, orderId: e.target.value }))}
-                          placeholder="Enter order ID"
-                          className="border-2 focus:border-primary"
-                        />
-                        <FieldError msg={e2.orderId} />
-                      </div>
-                    )}
+                    <div className="space-y-2 md:col-span-2">
+                      <Label htmlFor="orderId" className="font-semibold">
+                        Order ID{" "}
+                        {s2.productChoice === "DSC" || s2.productCustomName?.toUpperCase().includes("DSC")
+                          ? "*"
+                          : "(Optional)"}
+                      </Label>
+                      <Input
+                        id="orderId"
+                        type="text"
+                        value={s2.orderId}
+                        onChange={(e) => setS2((p) => ({ ...p, orderId: e.target.value }))}
+                        placeholder="Enter order ID"
+                        className="border-2 focus:border-primary"
+                      />
+                      <FieldError msg={e2.orderId} />
+                    </div>
 
                     <div className="space-y-2">
                       <Label htmlFor="orderDate" className="font-semibold">

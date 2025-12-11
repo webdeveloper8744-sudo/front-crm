@@ -14,10 +14,9 @@ import {
 } from "@/components/ui/alert-dialog"
 import { LeadWizard } from "./lead-wizard"
 import { LeadViewDialog } from "./lead-view-dialog"
-import { BulkUploadDialog } from "./bulk-upload-dialog"
 import { useEffect, useMemo, useState } from "react"
 import { LeadTable } from "./lead-table"
-import { FiPlus, FiDownload, FiUpload } from "react-icons/fi"
+import { FiPlus, FiDownload } from "react-icons/fi"
 import { toast } from "sonner"
 import { useAppDispatch, useAppSelector } from "@/store/hooks"
 import { fetchLeads, fetchLeadById, deleteLead } from "@/store/slices/leadSlice"
@@ -34,7 +33,6 @@ export function LeadsPage() {
   const [viewDialogOpen, setViewDialogOpen] = useState(false)
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false)
   const [leadToDelete, setLeadToDelete] = useState<string | null>(null)
-  const [bulkUploadOpen, setBulkUploadOpen] = useState(false)
 
   useEffect(() => {
     dispatch(fetchLeads() as any)
@@ -49,7 +47,6 @@ export function LeadsPage() {
   const canCreate = !isGuest // All except guest can create
   const canEdit = !isGuest // All except guest can edit
   const canDelete = isAdmin || isManager // Only admin and manager can delete
-  const canBulkUpload = isAdmin || isManager // Only admin and manager can bulk upload
 
   function handleDeleteClick(id: string) {
     if (!canDelete) {
@@ -123,11 +120,6 @@ export function LeadsPage() {
     }
   }
 
-  function handleBulkUploadComplete() {
-    dispatch(fetchLeads() as any)
-    setBulkUploadOpen(false)
-  }
-
   function handleNewLead() {
     if (!canCreate) {
       toast.error("You don't have permission to create leads")
@@ -154,17 +146,6 @@ export function LeadsPage() {
             <FiDownload className="size-4" />
             Export CSV
           </Button>
-          {canBulkUpload && (
-            <Button
-              onClick={() => setBulkUploadOpen(true)}
-              variant="outline"
-              className="gap-2 w-full sm:w-auto bg-transparent"
-              disabled={isLoading}
-            >
-              <FiUpload className="size-4" />
-              Bulk Upload
-            </Button>
-          )}
           {canCreate && (
             <Button onClick={handleNewLead} className="gap-2 w-full sm:w-auto" disabled={isLoading}>
               <FiPlus className="size-4" />
@@ -213,12 +194,6 @@ export function LeadsPage() {
         open={viewDialogOpen}
         onOpenChange={setViewDialogOpen}
         onViewReferredClient={handleViewReferredClient}
-      />
-
-      <BulkUploadDialog
-        open={bulkUploadOpen}
-        onOpenChange={setBulkUploadOpen}
-        onUploadComplete={handleBulkUploadComplete}
       />
 
       <AlertDialog open={deleteConfirmOpen} onOpenChange={setDeleteConfirmOpen}>
